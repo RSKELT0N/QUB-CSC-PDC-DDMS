@@ -1,28 +1,24 @@
+package core.peer;
+
 import java.io.IOException;
 import java.net.*;
-import java.util.Arrays;
 
 public class Node
 {
-    enum SStatus
-    {
-        INVALID,
-        VALID
-    }
-
     public Node(int port) throws SocketException, UnknownHostException
     {
         this.SetPort(port);
-        this.m_ip_address = Inet4Address.getLocalHost().getHostAddress();
+        this.m_ip_address = InetAddress.getLocalHost().getHostAddress();
         this.m_socket = new DatagramSocket(this.m_port);
+        m_socket.setSoTimeout(1000);
     }
 
-    public String ReceivePacket() throws IOException
+    public DatagramPacket ReceivePacket() throws IOException
     {
         DatagramPacket receive = DefinePacket(MAX_RECEIVE_SIZE);
         m_socket.receive(receive);
 
-        return Arrays.toString(receive.getData());
+        return receive;
     }
 
     public void SendPacket(String input, String ip_address, int port) throws IOException
@@ -45,7 +41,7 @@ public class Node
 
         byte[] bytes = input.getBytes();
         InetAddress address = InetAddress.getByName(ip_address);
-        return new DatagramPacket(bytes,input.length() - 1, address, port);
+        return new DatagramPacket(bytes,input.length(), address, port);
     }
 
     private void SetPort(int port)

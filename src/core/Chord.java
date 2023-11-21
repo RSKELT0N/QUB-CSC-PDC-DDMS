@@ -1,3 +1,7 @@
+package core;
+
+import core.peer.Peer;
+
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -5,7 +9,7 @@ import java.security.NoSuchAlgorithmException;
 
 public class Chord
 {
-    Chord(int port) throws IOException, NoSuchAlgorithmException
+    public Chord(int port) throws IOException, NoSuchAlgorithmException
     {
         DefinePeer(port);
         this.m_predecessor = this.m_peer;
