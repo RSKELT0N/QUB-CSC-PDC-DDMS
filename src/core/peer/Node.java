@@ -7,7 +7,7 @@ public class Node
 {
     public Node(int port) throws SocketException, UnknownHostException
     {
-        this.SetPort(port);
+        this.m_port = port;
         this.m_ip_address = InetAddress.getLocalHost().getHostAddress();
         this.m_socket = new DatagramSocket(this.m_port);
         m_socket.setSoTimeout(1000);
@@ -42,12 +42,6 @@ public class Node
         byte[] bytes = input.getBytes();
         InetAddress address = InetAddress.getByName(ip_address);
         return new DatagramPacket(bytes,input.length(), address, port);
-    }
-
-    private void SetPort(int port)
-    {
-        assert (port >= Math.pow(2, 10) && port <= (Math.pow(2, 16) - 1));
-        this.m_port = port;
     }
 
     public int m_port;

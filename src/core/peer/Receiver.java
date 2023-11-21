@@ -4,6 +4,7 @@ import core.Lib;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.SocketTimeoutException;
 
 class Receiver implements Runnable
 {
@@ -26,10 +27,12 @@ class Receiver implements Runnable
         {
             try {
                 DatagramPacket packet = this.m_receiver.ReceivePacket();
-                Lib.Pair<String, Integer> conn = new Lib.Pair<>(packet.getAddress().getHostAddress(), packet.getPort()); // TODO: Check host address with local to string
+                Lib.Pair<String, Integer> conn = new Lib.Pair<>(packet.getAddress().getHostAddress(), packet.getPort());
                 this.m_receiver_peer.AddReceiveItem(conn, Lib.FormatBytes(packet.getData(), packet.getLength()));
 
-            } catch (IOException | InterruptedException | RuntimeException e) {
+            } catch (SocketTimeoutException e) {
+                continue;
+            } catch (IOException | RuntimeException | InterruptedException e) {
                 break;
             }
         }
