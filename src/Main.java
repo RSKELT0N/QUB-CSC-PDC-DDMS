@@ -1,10 +1,11 @@
+import java.io.IOException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 
 public class Main
 {
-    public static void main(String[] args) throws SocketException, NoSuchAlgorithmException, UnknownHostException
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException
     {
         if(args.length != 1)
         {
@@ -12,6 +13,7 @@ public class Main
             System.exit(-1);
         }
 
-        Peer tmp = new Peer(Integer.parseInt(args[0]));
+        Chord chord = new Chord(Integer.parseInt(args[0]));
+        chord.m_peer.PrintFingerTable();
     }
 }
