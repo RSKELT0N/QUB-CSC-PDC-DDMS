@@ -31,9 +31,9 @@ public class Peer
         this.m_m_bits = 8;
 
         DefineUDPSocket(port);
-
         String hash_value = InetAddress.getLocalHost().getHostAddress() + ":" + this.m_socket.m_port;
         this.m_id = Lib.SHA1(hash_value, (int) Math.pow(2, this.m_m_bits));
+
         DefinePeerIDTable();
         DefineFingerTable();
         DefineSenderAndReceiver();
