@@ -4,29 +4,33 @@ import core.Lib;
 
 import java.net.*;
 import java.security.NoSuchAlgorithmException;
+import java.util.NavigableMap;
+import java.util.Optional;
+import java.util.TreeMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Peer
 {
-    static class FingerTableEntry
+    static public class FingerTableEntry
     {
-        int id;
-        String ip_address;
-        int port;
+        public int port;
+        public String ip_address;
+        public int successor;
+        public int predecessor;
 
-        FingerTableEntry(int id, String ip_address, int port)
+        public FingerTableEntry(String ip_address, int port, int succ, int predec)
         {
-            this.id = id;
             this.ip_address = ip_address;
             this.port = port;
+            this.successor = succ;
+            this.predecessor = predec;
         }
     }
-
 
     public Peer(int port) throws UnknownHostException, NoSuchAlgorithmException, SocketException
     {
         this.m_received = new LinkedBlockingQueue<>();
-        this.m_m_bits = 20;
+        this.m_m_bits = 100;
 
         DefineUDPSocket(port);
 
@@ -34,6 +38,28 @@ public class Peer
         this.m_id = Lib.SHA1(hash_value, this.m_m_bits);
         DefineFingerTable();
         DefineSenderAndReceiver();
+    }
+
+    public int GetSuccessor(int peer_id)
+    {
+        Integer succ = this.m_finger_table.higherKey(peer_id);
+
+        if(succ == null)
+        {
+            succ = this.m_finger_table.firstKey();
+        }
+        return succ;
+    }
+
+    public int GetPredecessor(int peer_id)
+    {
+        Integer predec = this.m_finger_table.lowerKey(peer_id);
+
+        if(predec == null)
+        {
+            predec = this.m_finger_table.lastKey();
+        }
+        return predec;
     }
 
     public void Close()
@@ -60,12 +86,9 @@ public class Peer
 
     public void PrintFingerTable()
     {
-        for(int i = 0; i < m_m_bits; i++)
+        for(var entry : m_finger_table.entrySet())
         {
-            System.out.println("(" + i + "): " +
-                               this.m_finger_table[i].id + ", " +
-                               this.m_finger_table[i].ip_address + ", " +
-                               this.m_finger_table[i].port);
+            System.out.println("(" + entry.getKey() + ") IP: [" + entry.getValue().ip_address + "] Port: [" + entry.getValue().port + "] Successor: [" + entry.getValue().successor + "] Predecessor: [" + entry.getValue().predecessor + "]");
         }
     }
 
@@ -100,26 +123,18 @@ public class Peer
 
     private void DefineFingerTable()
     {
-        this.m_finger_table = new FingerTableEntry[this.m_m_bits];
+        this.m_finger_table = new TreeMap<>();
 
-         for(int i = 0; i < this.m_m_bits; i++)
-        {
-            this.m_finger_table[i] = new FingerTableEntry(-1,
-                                                          "",
-                                                          -1);
-        }
-         this.m_finger_table[this.m_id].id = this.m_id;
-        this.m_finger_table[this.m_id].ip_address = this.m_socket.m_ip_address;
-        this.m_finger_table[this.m_id].port = this.m_socket.m_port;
+        this.m_finger_table.put(this.m_id, new FingerTableEntry(this.m_socket.m_ip_address, this.m_socket.m_port, this.m_id, this.m_id));
     }
 
-    private core.peer.Node m_socket;
-    private final int m_id;
-    private final int m_m_bits;
+    public final int m_id;
+    public final int m_m_bits;
+    public core.peer.Node m_socket;
 
-    private Sender m_sender;
-    private Receiver m_receiver;
-    public FingerTableEntry[] m_finger_table;
+    public Sender m_sender;
+    public Receiver m_receiver;
+    public NavigableMap<Integer, FingerTableEntry> m_finger_table;
     private final LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, String>> m_received;
 
 }
