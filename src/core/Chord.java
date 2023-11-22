@@ -47,14 +47,38 @@ public class Chord implements Remote
         this.m_commands.put("EXIT", this::Exit);
     }
 
-    private void UpdateSuccAndPreds()
+    private void ReachOutToPeers(Lib.Pair<Lib.Pair<String, Integer>, String> request, String[] tokens)
+    {
+        for(int i = 1; i < tokens.length - 1; i++)
+        {
+//            this.m_peer.Send();
+        }
+    }
+
+    private void UpdatePeerTable(Lib.Pair<Lib.Pair<String, Integer>, String> request, String[] tokens)
+    {
+        for(int i = 1; i < tokens.length - 1; i++)
+        {
+            int peer_id = Integer.parseInt(tokens[i]);
+            this.m_peer.m_peer_id_table.put(peer_id, request.first);
+        }
+    }
+
+    private void UpdateFingerTable(Lib.Pair<Lib.Pair<String, Integer>, String> request, String[] tokens)
     {
         for(var entry : this.m_peer.m_finger_table.entrySet())
         {
             Peer.FingerTableEntry curr_table = entry.getValue();
-            curr_table.successor = this.m_peer.GetSuccessor(entry.getKey());
-            curr_table.predecessor = this.m_peer.GetPredecessor(entry.getKey());
-            this.m_peer.m_finger_table.put(entry.getKey(), curr_table);
+
+            int updated_peer_id = this.m_peer.GetSuccessor(entry.getValue().data_id);
+
+            if(updated_peer_id != entry.getValue().peer_id)
+            {
+                curr_table.peer_id = updated_peer_id;
+                curr_table.ip_address = request.first.first;
+                curr_table.port = request.first.second;
+                this.m_peer.m_finger_table.put(entry.getKey(), curr_table);
+            }
         }
     }
 
@@ -70,7 +94,7 @@ public class Chord implements Remote
                     this.m_state = 2;
                 }
                 case 1 -> {
-                    this.m_peer.Send(new Lib.Pair<>(this.m_bootstrapped_ip, this.m_bootstrapped_port), "JOIN" + " " + this.m_peer.m_id);
+                    this.m_peer.Send(new Lib.Pair<>(this.m_bootstrapped_ip, this.m_bootstrapped_port), "JOIN" + " " + this.m_peer.m_id + " " + "REQUEST");
                     this.m_state = 0;
                 }
                 case 2 -> {
@@ -90,7 +114,7 @@ public class Chord implements Remote
 
         if(!this.m_commands.containsKey(tokens[0]))
         {
-            this.m_peer.Send(new Lib.Pair<>(ip_address.getHostAddress(), port), "EXIT");
+            this.CloseRemotePeer(new Lib.Pair<>(ip_address.getHostAddress(), port));
         }
         else
         {
@@ -108,14 +132,41 @@ public class Chord implements Remote
 
     private void Join(Lib.Pair<Lib.Pair<String, Integer>, String> request, String[] s) throws InterruptedException
     {
-        if(s.length >= 2)
+        String last_token = s[s.length - 1];
+
+        switch(last_token)
         {
-            if(!m_peer.m_finger_table.containsKey(Integer.parseInt(s[1])))
+            case "REQUEST" ->
             {
-                m_peer.m_finger_table.put(Integer.parseInt(s[1]), new Peer.FingerTableEntry(request.first.first, request.first.second, -1, -1));
-                UpdateSuccAndPreds();
+                if(s.length == 3)
+                {
+                  StringBuilder to_send = new StringBuilder();
+                  to_send.append("JOIN");
+
+                  this.m_peer.m_peer_id_table.forEach((peer_id, info) ->
+                  {
+                      to_send.append(" ").append(peer_id.intValue());
+                  });
+                  to_send.append(" ").append("RECEIVE");
+                  this.m_peer.Send(request.first, to_send.toString());
+
+                  UpdatePeerTable(request, s);
+                  UpdateFingerTable(request, s);
+                  this.m_peer.PrintFingerTable();
+
+                } else this.CloseRemotePeer(request.first);
+            }
+            case "RECEIVE" ->
+            {
+                UpdatePeerTable(request, s);
+                UpdateFingerTable(request, s);
+                ReachOutToPeers(request, s);
                 m_peer.PrintFingerTable();
             }
+        }
+        if(s.length >= 2)
+        {
+
         }
 
         if(s.length == 2)
@@ -129,6 +180,11 @@ public class Chord implements Remote
         System.out.println("Someone closed me");
         this.m_peer.Close();
         this.m_peer = null;
+    }
+
+    private void CloseRemotePeer(Lib.Pair<String, Integer> peer) throws InterruptedException
+    {
+        this.m_peer.Send(peer, "EXIT");
     }
 
     private int m_port;
