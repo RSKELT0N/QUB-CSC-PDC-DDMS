@@ -1,3 +1,4 @@
+import core.CMDLine;
 import core.Chord;
 
 import java.io.IOException;
@@ -23,7 +24,6 @@ public class Main
         }
 
         chord.CreatePeer();
-
         if(chord.GetPeer() != null)
             chord.GetPeer().Close();
     }

@@ -8,7 +8,7 @@ public class Node
     public Node(int port) throws SocketException, UnknownHostException
     {
         this.m_port = port;
-        this.m_ip_address = InetAddress.getLocalHost().getHostAddress();
+        this.m_ip_address = InetAddress.getLoopbackAddress().getHostAddress();
         this.m_socket = new DatagramSocket(this.m_port);
         m_socket.setSoTimeout(1000);
     }
