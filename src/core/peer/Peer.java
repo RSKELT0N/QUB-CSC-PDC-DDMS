@@ -38,14 +38,14 @@ public class Peer
     public Peer(int port) throws IOException, NoSuchAlgorithmException
     {
         this.m_received = new LinkedBlockingQueue<>();
-        this.m_m_bits = 8;
+        this.m_m_bits = 3;
 
         DefineUDPSocket(port);
         String hash_value = InetAddress.getLocalHost().getHostAddress() + ":" + this.m_socket.m_port;
         this.m_id = Lib.SHA1(hash_value, 1<<m_m_bits);
 
         DefineRoutingTable();
-        InsertPeerIntoRoutingTable(m_id, m_socket.m_ip_address, m_socket.m_port);
+//        InsertPeerIntoRoutingTable(m_id, m_socket.m_ip_address, m_socket.m_port);
     }
 
     public void DefineSenderAndReceiver()
@@ -83,9 +83,8 @@ public class Peer
         assert message_string_tokens.length == 1;
         int peer_id = Integer.parseInt(message_string_tokens[0]);
 
-        InsertPeerIntoRoutingTable(peer_id, peer_info.ip_address, peer_info.port);
-
         RoutingTableEntry[] close_peers = GetClosePeers(peer_id);
+        InsertPeerIntoRoutingTable(peer_id, peer_info.ip_address, peer_info.port);
 
         byte[] initial_command = ("FIND_NODE_RESPONSE ").getBytes();
 
@@ -109,10 +108,13 @@ public class Peer
         ByteArrayInputStream in = new ByteArrayInputStream(message);
         ObjectInputStream iis = new ObjectInputStream(in);
 
+        Send(peer_info.ip_address, peer_info.port, ("PING" + " " + this.m_id).getBytes());
         RoutingTableEntry[] peers = (RoutingTableEntry[]) iis.readObject();
 
         for(var peer : peers)
+        {
             Send(peer.ip_address, peer.port, ("PING" + " " + this.m_id).getBytes());
+        }
     }
 
     public void Close()
@@ -175,7 +177,8 @@ public class Peer
         for(int i = 0; i < m_m_bits; i++)
         {
             RoutingTableEntry[] bucket_peers = GetClosePeersFromBucket(peer_id, 1<<i, take_all);
-            all_peers.addAll(Arrays.asList(bucket_peers));
+            if(bucket_peers != null)
+                all_peers.addAll(Arrays.asList(bucket_peers));
         }
 
         return all_peers.toArray(new RoutingTableEntry[all_peers.size()]);
@@ -190,10 +193,10 @@ public class Peer
         {
             if(!take_all)
             {
-                if(Distance(peer_id, bucket_id) < closest_peer_dist.get())
+                if(Distance(peer_id, id) < closest_peer_dist.get())
                 {
-                    closest_peer_dist.set(Distance(peer_id, bucket_id));
-                    closest_peer.set(peer_id);
+                    closest_peer_dist.set(Distance(peer_id, id));
+                    closest_peer.set(id);
                 }
             } else peers.add(peer);
         });
@@ -201,7 +204,7 @@ public class Peer
         if(!take_all && closest_peer.get() != -1)
             peers.add(this.m_routing_table.get(bucket_id).get(closest_peer.get()));
 
-        return peers.toArray(new RoutingTableEntry[peers.size()]);
+        return peers.isEmpty() ? null : peers.toArray(new RoutingTableEntry[peers.size()]);
     }
 
     private int GetTotalPeersInRoutingTable()
@@ -224,7 +227,7 @@ public class Peer
     private int DetermineBucket(int id)
     {
         int min = Distance(1, id);
-        int min_pow = 0;
+        int min_pow = 1;
 
         for(int i = 0; i < m_m_bits; i++)
         {

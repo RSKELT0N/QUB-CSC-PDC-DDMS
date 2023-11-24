@@ -4,9 +4,6 @@ import core.peer.Peer;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.rmi.Remote;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
