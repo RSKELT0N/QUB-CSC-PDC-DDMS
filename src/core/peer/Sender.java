@@ -20,7 +20,7 @@ class Sender implements Runnable
         this.m_running = state;
     }
 
-    public void AddSendItem(Lib.Pair<String, Integer> p, String s) throws InterruptedException
+    public void AddSendItem(Lib.Pair<String, Integer> p, byte[] s) throws InterruptedException
     {
         m_queue.put(new Lib.Pair<>(p, s));
     }
@@ -30,7 +30,7 @@ class Sender implements Runnable
     {
         while(this.m_running)
         {
-            Lib.Pair<Lib.Pair<String, Integer>, String> current_item = null;
+            Lib.Pair<Lib.Pair<String, Integer>, byte[]> current_item = null;
             try {
                 current_item = m_queue.poll(1000, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
@@ -43,7 +43,7 @@ class Sender implements Runnable
                 {
                     String ip_address = current_item.first.first;
                     int port = current_item.first.second;
-                    String message = current_item.second;
+                    byte[] message = current_item.second;
                     this.m_sender.SendPacket(message, ip_address, port);
                 }
                 catch (IOException e)
@@ -56,5 +56,5 @@ class Sender implements Runnable
 
     private boolean m_running;
     private final core.peer.Node m_sender;
-    private final LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, String>> m_queue;
+    private final LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, byte[]>> m_queue;
 }

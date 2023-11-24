@@ -5,7 +5,7 @@ import java.net.*;
 
 public class Node
 {
-    public Node(int port) throws SocketException, UnknownHostException
+    public Node(int port) throws SocketException
     {
         this.m_port = port;
         this.m_ip_address = InetAddress.getLoopbackAddress().getHostAddress();
@@ -21,7 +21,7 @@ public class Node
         return receive;
     }
 
-    public void SendPacket(String input, String ip_address, int port) throws IOException
+    public void SendPacket(byte[] input, String ip_address, int port) throws IOException
     {
         DatagramPacket packet = DefinePacket(input, ip_address, port);
         m_socket.send(packet);
@@ -35,17 +35,16 @@ public class Node
         return new DatagramPacket(bytes, 0, size);
     }
 
-    private DatagramPacket DefinePacket(String input, String ip_address, int port) throws UnknownHostException
+    private DatagramPacket DefinePacket(byte[] input, String ip_address, int port) throws UnknownHostException
     {
-        assert !(input.isEmpty());
+        assert input.length != 0;
 
-        byte[] bytes = input.getBytes();
         InetAddress address = InetAddress.getByName(ip_address);
-        return new DatagramPacket(bytes,input.length(), address, port);
+        return new DatagramPacket(input, input.length, address, port);
     }
 
     public int m_port;
     public String m_ip_address;
     public DatagramSocket m_socket;
-    private final int MAX_RECEIVE_SIZE = (int) Math.pow(2, 8);
+    private final int MAX_RECEIVE_SIZE = 1<<8;
 }

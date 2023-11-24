@@ -13,7 +13,6 @@ public class CMDLine
         this.m_chord = chord;
         this.m_stdin = new Scanner(System.in);
         SetAliveState(true);
-        chord.CreatePeer();
         InitialiseCommands();
         ReceiveInput();
     }

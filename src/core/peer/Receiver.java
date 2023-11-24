@@ -28,7 +28,7 @@ class Receiver implements Runnable
             try {
                 DatagramPacket packet = this.m_receiver.ReceivePacket();
                 Lib.Pair<String, Integer> conn = new Lib.Pair<>(packet.getAddress().getHostAddress(), packet.getPort());
-                this.m_receiver_peer.AddReceiveItem(conn, Lib.FormatBytes(packet.getData(), packet.getLength()));
+                this.m_receiver_peer.AddReceiveItem(conn, packet.getData());
 
             } catch (SocketTimeoutException e) {
                 continue;

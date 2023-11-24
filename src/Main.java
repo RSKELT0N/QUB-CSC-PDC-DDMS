@@ -23,7 +23,6 @@ public class Main
             System.exit(-1);
         }
 
-        chord.CreatePeer();
         if(chord.GetPeer() != null)
             chord.GetPeer().Close();
     }
