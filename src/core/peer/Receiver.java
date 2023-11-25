@@ -6,18 +6,13 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
 
-class Receiver implements Runnable
+class Receiver extends Runner
 {
     Receiver(Peer receive_peer)
     {
-        SetState(true);
+        super();
         this.m_receiver_peer = receive_peer;
         this.m_receiver = receive_peer.GetSocket();
-    }
-
-    public void SetState(boolean state)
-    {
-        this.m_running = state;
     }
 
     @Override
@@ -38,7 +33,6 @@ class Receiver implements Runnable
         }
     }
 
-    private boolean m_running;
     private core.peer.Node m_receiver;
     private Peer m_receiver_peer;
 }

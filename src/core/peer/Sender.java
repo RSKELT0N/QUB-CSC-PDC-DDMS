@@ -6,23 +6,13 @@ import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-class Sender implements Runnable
+class Sender extends Runner
 {
     Sender(core.peer.Node send_peer)
     {
-        SetState(true);
+        super();
         this.m_sender = send_peer;
         this.m_queue = new LinkedBlockingQueue<>();
-    }
-
-    public void SetState(boolean state)
-    {
-        this.m_running = state;
-    }
-
-    public void AddSendItem(Lib.Pair<String, Integer> p, byte[] s) throws InterruptedException
-    {
-        m_queue.put(new Lib.Pair<>(p, s));
     }
 
     @Override
@@ -54,7 +44,11 @@ class Sender implements Runnable
         }
     }
 
-    private boolean m_running;
+    public void AddSendItem(Lib.Pair<String, Integer> p, byte[] s) throws InterruptedException
+    {
+        m_queue.put(new Lib.Pair<>(p, s));
+    }
+
     private final core.peer.Node m_sender;
     private final LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, byte[]>> m_queue;
 }
