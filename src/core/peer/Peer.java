@@ -33,19 +33,32 @@ public class Peer
             this.ip_address = ip_address;
             this.port = port;
         }
+
+        @Override
+        public boolean equals(Object in)
+        {
+            if (!(in instanceof RoutingTableEntry)) {
+                return false;
+            }
+
+            RoutingTableEntry e = (RoutingTableEntry)in;
+            return this.id == e.id &&
+                   this.port == e.port &&
+                   this.ip_address.equals(e.ip_address);
+        }
     }
 
     public Peer(int port) throws IOException, NoSuchAlgorithmException
     {
         this.m_received = new LinkedBlockingQueue<>();
-        this.m_m_bits = 3;
+        this.m_m_bits = 8;
 
         DefineUDPSocket(port);
         String hash_value = InetAddress.getLocalHost().getHostAddress() + ":" + this.m_socket.m_port;
         this.m_id = Lib.SHA1(hash_value, 1<<m_m_bits);
 
         DefineRoutingTable();
-//        InsertPeerIntoRoutingTable(m_id, m_socket.m_ip_address, m_socket.m_port);
+        DefineDataTable();
     }
 
     public void DefineSenderAndReceiver()
@@ -58,6 +71,8 @@ public class Peer
         receiver.start();
         sender.start();
     }
+
+
 
     public void Ping(RoutingTableEntry peer_info, byte[] message) throws InterruptedException
     {
@@ -155,6 +170,23 @@ public class Peer
         System.out.println("---------------");
     }
 
+    public void PrintDataTable()
+    {
+        System.out.println("Peer (" + m_id + ") data table\n---------------");
+
+        if(m_data_table.size() == 0)
+        {
+            System.out.println("No data entries");
+            return;
+        }
+
+        for(var data : m_data_table.entrySet())
+        {
+            System.out.println(data.getKey() + " | " + data.getValue());
+        }
+        System.out.println("---------------");
+    }
+
     public void AddReceiveItem(Lib.Pair<String, Integer> r, byte[] s) throws InterruptedException
     {
         this.m_received.put(new Lib.Pair<>(new Lib.Pair<>(r.first, r.second), s));
@@ -167,53 +199,97 @@ public class Peer
 
     private RoutingTableEntry[] GetClosePeers(int peer_id)
     {
-        ArrayList<RoutingTableEntry> peers = new ArrayList<>();
-
-        int total = GetTotalPeersInRoutingTable();
+        int total = GetTotalPeersInRoutingTable(peer_id);
         boolean take_all = total <= m_m_bits;
 
         ArrayList<RoutingTableEntry> all_peers = new ArrayList<>();
+        ArrayList<RoutingTableEntry> remaining_peers = new ArrayList<>();
 
         for(int i = 0; i < m_m_bits; i++)
         {
-            RoutingTableEntry[] bucket_peers = GetClosePeersFromBucket(peer_id, 1<<i, take_all);
-            if(bucket_peers != null)
-                all_peers.addAll(Arrays.asList(bucket_peers));
+            Lib.Pair<RoutingTableEntry[], RoutingTableEntry[]> bucket_peers = GetClosePeersFromBucket(peer_id, 1<<i, take_all);
+            if(bucket_peers.first != null) {
+                all_peers.addAll(Arrays.asList(bucket_peers.first));
+            }
+
+            if(bucket_peers.second != null) {
+                remaining_peers.addAll(Arrays.asList(bucket_peers.second));
+            }
+        }
+
+        // Get remaining peers based on closest to equal total.
+        if(!take_all && all_peers.size() < m_m_bits)
+        {
+            int diff = Math.abs(all_peers.size() - m_m_bits);
+
+            while(diff > 0)
+            {
+                int curr_closest_peer_idx = GetRemainingClosestPeers(peer_id, remaining_peers);
+
+                all_peers.add(remaining_peers.get(curr_closest_peer_idx));
+                remaining_peers.remove(curr_closest_peer_idx);
+                diff--;
+            }
         }
 
         return all_peers.toArray(new RoutingTableEntry[all_peers.size()]);
     }
 
-    private RoutingTableEntry[] GetClosePeersFromBucket(int peer_id, int bucket_id, boolean take_all)
+    private Lib.Pair<RoutingTableEntry[], RoutingTableEntry[]> GetClosePeersFromBucket(int peer_id, int bucket_id, boolean take_all)
     {
         ArrayList<RoutingTableEntry> peers = new ArrayList<>();
+        ArrayList<RoutingTableEntry> remaining_peers = new ArrayList<>();
         AtomicInteger closest_peer_dist = new AtomicInteger(Integer.MAX_VALUE);
         AtomicInteger closest_peer = new AtomicInteger(-1);
+        
         this.m_routing_table.get(bucket_id).forEach((id, peer) ->
         {
             if(!take_all)
             {
-                if(Distance(peer_id, id) < closest_peer_dist.get())
+                if(Distance(peer_id, id) < closest_peer_dist.get() && id != peer_id)
                 {
                     closest_peer_dist.set(Distance(peer_id, id));
                     closest_peer.set(id);
                 }
             } else peers.add(peer);
+            remaining_peers.add(peer);
         });
 
         if(!take_all && closest_peer.get() != -1)
             peers.add(this.m_routing_table.get(bucket_id).get(closest_peer.get()));
 
-        return peers.isEmpty() ? null : peers.toArray(new RoutingTableEntry[peers.size()]);
+        for (RoutingTableEntry peer : peers)
+            remaining_peers.remove(peer);
+
+        return new Lib.Pair<>(peers.isEmpty() ? null : peers.toArray(new RoutingTableEntry[peers.size()]),
+                              remaining_peers.isEmpty() ? null : remaining_peers.toArray(new RoutingTableEntry[remaining_peers.size()]));
     }
 
-    private int GetTotalPeersInRoutingTable()
+    private int GetRemainingClosestPeers(int peer_id, ArrayList<RoutingTableEntry> remaining_peers)
+    {
+        int curr_closest_peer_dist = Integer.MAX_VALUE;
+        int curr_closest_idx = -1;
+        for (int i = 0; i < remaining_peers.size(); i++)
+        {
+            if (Distance(peer_id, remaining_peers.get(i).id) < curr_closest_peer_dist && remaining_peers.get(i).id != peer_id) {
+                curr_closest_peer_dist = Distance(peer_id, remaining_peers.get(i).id);
+                curr_closest_idx = i;
+            }
+        }
+        return curr_closest_idx;
+    }
+
+    private int GetTotalPeersInRoutingTable(int peer_id)
     {
         AtomicInteger sum = new AtomicInteger();
 
         this.m_routing_table.forEach((bucket_id, bucket) ->
         {
-            sum.addAndGet(bucket.size());
+            int bias = 0;
+            if(bucket.get(peer_id) != null)
+                bias = -1;
+            
+            sum.addAndGet(bucket.size() + bias);
         });
 
         return sum.get();
@@ -259,12 +335,17 @@ public class Peer
         }
     }
 
-    private void DefineRoutingTable() throws IOException
+    private void DefineRoutingTable()
     {
         this.m_routing_table = new TreeMap<>();
 
         for(int i = 0; i < this.m_m_bits; i++)
             this.m_routing_table.put(1<<i, new TreeMap<>());
+    }
+
+    private void DefineDataTable()
+    {
+        this.m_data_table = new TreeMap<>();
     }
 
     public final int m_id;
@@ -274,6 +355,7 @@ public class Peer
     public Sender m_sender;
     public Receiver m_receiver;
     public NavigableMap<Integer, NavigableMap<Integer, RoutingTableEntry>> m_routing_table;
+    public NavigableMap<Integer, String> m_data_table;
     private final LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, byte[]>> m_received;
 
 }

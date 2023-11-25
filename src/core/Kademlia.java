@@ -8,39 +8,22 @@ import java.rmi.Remote;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
-public class Chord implements Remote, Runnable
+public class Kademlia implements Remote, Runnable
 {
-    public Chord(int port) throws IOException, NoSuchAlgorithmException
+    public Kademlia(int port)
     {
         this.m_state = 0;
         this.m_port = port;
-        m_peer = new Peer(this.m_port);
-        m_peer.DefineSenderAndReceiver();
-        DefineCommands();
-        this.run();
+        new Thread(this).start();
     }
 
-    public Chord(int port, String bootstrapped_ip, int bootstrapped_port) throws IOException, NoSuchAlgorithmException
+    public Kademlia(int port, String bootstrapped_ip, int bootstrapped_port)
     {
         this.m_state = 1;
         this.m_port = port;
         this.m_bootstrapped_ip = bootstrapped_ip;
         this.m_bootstrapped_port = bootstrapped_port;
-        m_peer = new Peer(this.m_port);
-        m_peer.DefineSenderAndReceiver();
-        DefineCommands();
-        this.run();
-    }
-
-    public void Close()
-    {
-        m_peer.Close();
-        m_peer = null;
-    }
-
-    public Peer GetPeer()
-    {
-        return m_peer;
+        new Thread(this).start();
     }
 
     private void DefineCommands()
@@ -55,11 +38,10 @@ public class Chord implements Remote, Runnable
 
     public void run()
     {
-        this.m_peer.PrintRoutingTable();
-        Lib.Pair<Lib.Pair<String, Integer>, byte[]> current_input = null;
-
         try
         {
+            InitPeer();
+            Lib.Pair<Lib.Pair<String, Integer>, byte[]> current_input = null;
             while (m_peer != null) {
                 switch (this.m_state) {
                     case 0 -> {
@@ -99,9 +81,15 @@ public class Chord implements Remote, Runnable
             var command = this.m_commands.get(tokens[0]);
             command.Parse(new Peer.RoutingTableEntry(request.first.first, request.first.second), Arrays.copyOfRange(request.second, tokens[0].length() + 1, request.second.length));
         }
-        m_peer.PrintRoutingTable();
 
         this.m_state = 0;
+    }
+
+    private void InitPeer() throws IOException, NoSuchAlgorithmException
+    {
+        m_peer = new Peer(this.m_port);
+        m_peer.DefineSenderAndReceiver();
+        DefineCommands();
     }
 
     private void Exit(Peer.RoutingTableEntry peer_info, byte[] message)
@@ -115,10 +103,21 @@ public class Chord implements Remote, Runnable
         m_peer.Send(peer.first, peer.second, ("EXIT").getBytes());
     }
 
+    public void Close()
+    {
+        m_peer.Close();
+        m_peer = null;
+    }
+
+    public Peer GetPeer()
+    {
+        return m_peer;
+    }
+
     private int m_port;
     private int m_state;
     private Peer m_peer;
     private String m_bootstrapped_ip;
     private int m_bootstrapped_port;
-    private HashMap<String, DDMSCommand> m_commands;
+    private HashMap<String, RPC> m_commands;
 }

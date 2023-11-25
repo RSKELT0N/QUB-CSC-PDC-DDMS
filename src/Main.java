@@ -1,5 +1,5 @@
-import core.CMDLine;
-import core.Chord;
+import core.Input;
+import core.Kademlia;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -8,14 +8,14 @@ public class Main
 {
     public static void main(String[] args) throws IOException, NoSuchAlgorithmException, InterruptedException
     {
-        Chord chord = null;
+        Kademlia kademlia = null;
         if (args.length == 1)
         {
-            chord = new Chord(Integer.parseInt(args[0]));
+            kademlia = new Kademlia(Integer.parseInt(args[0]));
         }
         else if (args.length == 3)
         {
-            chord = new Chord(Integer.parseInt(args[0]), args[1], Integer.parseInt(args[2]));
+            kademlia = new Kademlia(Integer.parseInt(args[0]), args[1], Integer.parseInt(args[2]));
         }
         else
         {
@@ -23,7 +23,7 @@ public class Main
             System.exit(-1);
         }
 
-        if(chord.GetPeer() != null)
-            chord.GetPeer().Close();
+        Input in = new Input(kademlia);
+        in.ReceiveInput();
     }
 }
