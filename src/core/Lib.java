@@ -19,7 +19,7 @@ public class Lib
         public S second;
     }
 
-    public static int SHA1(String input, int mod) throws NoSuchAlgorithmException
+    public static BigInteger SHA1(String input, BigInteger mod) throws NoSuchAlgorithmException
     {
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         md.update(input.getBytes(StandardCharsets.UTF_8));
@@ -31,7 +31,7 @@ public class Lib
             hexString.append(String.format("%02x", b));
         }
 
-        return new BigInteger(hexString.toString(), 16).mod(BigInteger.valueOf(mod)).intValue();
+        return new BigInteger(hexString.toString(), 16).mod(mod);
     }
 
     static public String FormatBytes(byte[] bytes, int length)

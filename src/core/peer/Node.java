@@ -46,5 +46,5 @@ public class Node
     public int m_port;
     public String m_ip_address;
     public DatagramSocket m_socket;
-    private final int MAX_RECEIVE_SIZE = 2<<16;
+    private final int MAX_RECEIVE_SIZE = 1<<16;
 }

@@ -1,6 +1,8 @@
 package core;
 
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Scanner;
 
@@ -19,13 +21,13 @@ public class Input
         this.m_commands = new HashMap<>();
         m_commands.put("/help", new Lib.Pair<>(this::Help, "Display the necessary information to control the program"));
         m_commands.put("/exit", new Lib.Pair<>(this::Exit, "Close the peer and exit the program"));
-        m_commands.put("/print [option]", new Lib.Pair<>(this::Print, "Will invoke the print function"));
+        m_commands.put("/print", new Lib.Pair<>(this::Print, "Will invoke the print function"));
         m_commands.put("/clear", new Lib.Pair<>(this::Clear, "Will reset the console"));
-        m_commands.put("/store [key] [value]", new Lib.Pair<>(this::Clear, "Store a key/value pair in the distributed system"));
-        m_commands.put("/get [key]", new Lib.Pair<>(this::Clear, "Get the value of the respective key in the distributed system"));
+        m_commands.put("/store", new Lib.Pair<>(this::Store, "Store a key/value pair in the distributed system"));
+        m_commands.put("/get", new Lib.Pair<>(this::Clear, "Get the value of the respective key in the distributed system"));
     }
 
-    public void ReceiveInput() throws InterruptedException, IOException
+    public void ReceiveInput() throws InterruptedException, IOException, NoSuchAlgorithmException
     {
         PrintStartUp();
         while (m_alive)
@@ -75,7 +77,8 @@ public class Input
                 case "dt" -> this.m_kademlia.GetPeer().PrintDataTable();
                 default -> System.out.println("~ Option not valid");
             }
-        } else if(tokens.length == 1)
+        }
+        else if(tokens.length == 1)
         {
             System.out.println("~ Append an option to the command");
             System.out.println("[rt] - routing table");
@@ -89,9 +92,12 @@ public class Input
         else System.out.println("~ Incorrect parameter amount");
     }
 
-    private void Store(String[] tokens)
+    private void Store(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
     {
-        this.m_kademlia.GetPeer().Store();
+        if(tokens.length == 3)
+            this.m_kademlia.StoreData(Arrays.copyOfRange(tokens, 1, tokens.length));
+        else System.out.println("~ Incorrect parameter amount");
+
     }
 
     private void Help(String[] tokens)

@@ -33,7 +33,15 @@ public class Kademlia implements Remote, Runnable
         this.m_commands.put("PONG", this.m_peer::Pong);
         this.m_commands.put("FIND_NODE_REQUEST", this.m_peer::FindNodeRequest);
         this.m_commands.put("FIND_NODE_RESPONSE", this.m_peer::FindNodeResponse);
+        this.m_commands.put("STORE", this.m_peer::Store);
         this.m_commands.put("EXIT", this::Exit);
+    }
+
+    public void StoreData(String[] tokens) throws NoSuchAlgorithmException, InterruptedException {
+        String key = tokens[0];
+        String value = tokens[1];
+
+        m_peer.AddDataItem(key, value);
     }
 
     public void run()
@@ -66,7 +74,7 @@ public class Kademlia implements Remote, Runnable
         }
     }
 
-    private void HandleCommand(Lib.Pair<Lib.Pair<String, Integer>, byte[]> request) throws IOException, InterruptedException, ClassNotFoundException
+    private void HandleCommand(Lib.Pair<Lib.Pair<String, Integer>, byte[]> request) throws IOException, InterruptedException, ClassNotFoundException, NoSuchAlgorithmException
     {
         int port = request.first.second;
         InetAddress ip_address = InetAddress.getByName(request.first.first);
