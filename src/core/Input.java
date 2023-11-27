@@ -2,10 +2,7 @@ package core;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Optional;
-import java.util.Scanner;
+import java.util.*;
 
 public class Input
 {
@@ -38,9 +35,9 @@ public class Input
         this.m_commands = new HashMap<>();
         m_commands.put("/help",    new CommandEntry(this::Help,    "Display the necessary information to control the program",      0, "/help"));
         m_commands.put("/exit",    new CommandEntry(this::Exit,    "Close the peer and exit the program",                           0, "/exit"));
-        m_commands.put("/print",   new CommandEntry(this::Print,   "Will invoke the print function",                                0, "/print"));
+        m_commands.put("/print",   new CommandEntry(this::Print,   "Will invoke the print function",                                1, "/print"));
         m_commands.put("/connect", new CommandEntry(this::Connect, "Will connect to bootstrapped node",                             2, "/connect [ip] [port]"));
-        m_commands.put("/clear",   new CommandEntry(this::Clear,   "Will reset the console",                                        0, "/clear"));
+        m_commands.put("/clear",   new CommandEntry(this::Clear,   "Will reset the data table within the peer",                     0, "/clear"));
         m_commands.put("/store",   new CommandEntry(this::Store,   "Store a key/value pair in the distributed system",              2, "/store [key] [value]"));
         m_commands.put("/get",     new CommandEntry(this::Get,     "Get the value of the respective key in the distributed system", 1, "/get [key]"));
     }
@@ -55,7 +52,7 @@ public class Input
 
             if(command.isPresent())
             {
-                if(command.get().m_argc == curr_input.split(" ").length - 1)
+                if(command.get().m_argc >= curr_input.split(" ").length - 1)
                     command.get().m_cmd.Parse(curr_input.split(" "));
                 else System.out.println("~ Incorrect parameter amount");
             } else System.out.println("~ unknown command");
@@ -82,30 +79,30 @@ public class Input
         m_kademlia.ConnectToBootStrapped(tokens[1], Integer.parseInt(tokens[2]));
     }
 
-    private void Clear(String[] tokens) throws IOException
+    private void Clear(String[] tokens)
     {
-        final String os = System.getProperty("os.name");
-
-        if (os.contains("Windows"))
-            Runtime.getRuntime().exec("cls");
-        else Runtime.getRuntime().exec("clear");
-
-        PrintStartUp();
+        m_kademlia.GetPeer().m_data_table = new TreeMap<>();
     }
 
     private void Print(String[] tokens)
     {
-        System.out.println("~ Select option");
-        System.out.println("[rt] - routing table");
-        System.out.println("[dt] - data table");
-        System.out.println("[info] - peer info");
-
-        switch (GetInput())
+        String option;
+        if(tokens.length == 1)
         {
-            case "rt" -> this.m_kademlia.GetPeer().PrintRoutingTable();
-            case "dt" -> this.m_kademlia.GetPeer().PrintDataTable();
-            case "info" -> this.m_kademlia.PrintInfo();
-            default -> System.out.println("~ Option not valid");
+            System.out.println("~ Select option");
+            System.out.println("[rt] - routing table");
+            System.out.println("[dt] - data table");
+            System.out.println("[info] - peer info");
+
+            option = GetInput();
+        } else option = tokens[1];
+
+        switch (option)
+        {
+            case "rt": this.m_kademlia.GetPeer().PrintRoutingTable(); break;
+            case "dt": this.m_kademlia.GetPeer().PrintDataTable(); break;
+            case "info": this.m_kademlia.PrintInfo(); break;
+            default: System.out.println("~ Option not valid"); break;
         }
     }
 
@@ -114,9 +111,9 @@ public class Input
         this.m_kademlia.StoreData(Arrays.copyOfRange(tokens, 1, tokens.length));
     }
 
-    private void Get(String[] tokens)
+    private void Get(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
     {
-        this.m_kademlia.GetData(tokens[1]);
+        this.m_kademlia.GetPeer().GetDataItem(tokens[1]);
     }
 
     private void Help(String[] tokens)

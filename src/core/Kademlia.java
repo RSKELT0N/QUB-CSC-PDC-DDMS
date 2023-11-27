@@ -45,13 +45,14 @@ public class Kademlia implements Remote, Runnable
     private void DefineCommands()
     {
         this.m_commands = new HashMap<>();
-        this.m_commands.put("PING", this.m_peer::Ping);
-        this.m_commands.put("PONG", this.m_peer::Pong);
-        this.m_commands.put("FIND_NODE_REQUEST", this.m_peer::FindNodeRequest);
-        this.m_commands.put("FIND_NODE_RESPONSE", this.m_peer::FindNodeResponse);
-        this.m_commands.put("FIND_VALUE", this.m_peer::FindValue);
-        this.m_commands.put("STORE", this.m_peer::Store);
-        this.m_commands.put("EXIT", this::Exit);
+        this.m_commands.put("PING",                this.m_peer::Ping);
+        this.m_commands.put("PONG",                this.m_peer::Pong);
+        this.m_commands.put("FIND_NODE_REQUEST",   this.m_peer::FindNodeRequest);
+        this.m_commands.put("FIND_NODE_RESPONSE",  this.m_peer::FindNodeResponse);
+        this.m_commands.put("FIND_VALUE_REQUEST",  this.m_peer::FindValueRequest);
+        this.m_commands.put("FIND_VALUE_RESPONSE", this.m_peer::FindValueResponse);
+        this.m_commands.put("STORE",               this.m_peer::Store);
+        this.m_commands.put("EXIT",                this::Exit);
     }
 
     public void PrintInfo()
@@ -73,20 +74,6 @@ public class Kademlia implements Remote, Runnable
         m_peer.AddDataItem(key, value);
     }
 
-    public void GetData(String data_item)
-    {
-        boolean is_integer = data_item.matches("-?(0|[1-9]\\d*)");
-        Optional<String> value;
-
-        if(is_integer)
-            value = m_peer.GetDataItem(new BigInteger(data_item));
-        else value = m_peer.GetDataItem(data_item);
-
-        if(value.isEmpty())
-            System.out.println("~ Data item not present");
-        else System.out.println(value.get());
-    }
-
     public void run()
     {
         try
@@ -98,21 +85,24 @@ public class Kademlia implements Remote, Runnable
             Lib.Pair<Lib.Pair<String, Integer>, byte[]> current_input = null;
             while (m_peer != null) {
                 switch (this.m_state) {
-                    case 0 -> {
+                    case 0: {
                         current_input = m_peer.GetNextReceived();
 
                         if(!m_bootstrapped)
                             this.m_state = (current_input == null) ? 0 : 2;
+                        break;
                     }
-                    case 1 -> {
+                    case 1: {
                         m_peer.Send(this.m_bootstrapped_ip, this.m_bootstrapped_port, ("FIND_NODE_REQUEST" + " " + m_peer.m_id).getBytes());
                         this.m_state = 0;
                         this.m_bootstrapped = false;
+                        break;
                     }
-                    case 2 -> {
+                    case 2: {
                         assert current_input != null;
                         HandleCommand(current_input);
                         this.m_state = 0;
+                        break;
                     }
                 }
             }

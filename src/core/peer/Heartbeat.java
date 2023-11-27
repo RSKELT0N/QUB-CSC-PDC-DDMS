@@ -21,7 +21,7 @@ class Heartbeat extends Runner
         {
             try
             {
-                ExploreNewNeighbours();
+                ExploreCloseNeighbours();
                 PingAllRoutingTable();
                 ShareAllDataItemsToNeighbours();
                 Thread.sleep((long) (m_interval * 1e3));
@@ -34,7 +34,7 @@ class Heartbeat extends Runner
         }
     }
 
-    private void ExploreNewNeighbours() throws InterruptedException
+    private void ExploreCloseNeighbours() throws InterruptedException
     {
         Peer.RoutingTableEntry[] close_neighbours = m_peer.GetClosePeers(m_peer.m_id);
         for(var peer : close_neighbours)
@@ -45,11 +45,11 @@ class Heartbeat extends Runner
 
     private void ShareAllDataItemsToNeighbours() throws InterruptedException
     {
-        Peer.RoutingTableEntry[] close_peers = m_peer.GetClosePeers(m_peer.m_id);
 
         for(var data : m_peer.m_data_table.entrySet())
         {
-            for(var peer: close_peers)
+            Peer.RoutingTableEntry[] close_peers_to_key = m_peer.GetClosePeers(data.getKey());
+            for(var peer: close_peers_to_key)
             {
                 m_peer.Send(peer.ip_address, peer.port, ("STORE" + " " + data.getValue().first + "," + data.getValue().second).getBytes());
             }
@@ -70,13 +70,15 @@ class Heartbeat extends Runner
 
     private void RemoveUnRespondedNeighbours()
     {
-        for(var peer : m_peer.m_ping_vector.entrySet())
+        try
         {
-            if(!(m_peer.GetPingStateForPeer(peer.getKey())))
-            {
-                m_peer.RemovePeerFromRoutingTable(peer.getKey());
-            } else m_peer.SetPingStateForPeer(peer.getKey(), false);
+            for (var peer : m_peer.m_ping_vector.entrySet()) {
+                if (!(m_peer.GetPingStateForPeer(peer.getKey()))) {
+                    m_peer.RemovePeerFromRoutingTable(peer.getKey());
+                } else m_peer.SetPingStateForPeer(peer.getKey(), false);
+            }
         }
+        catch (Exception e) {}
     }
 
     public void AddSendItem(Lib.Pair<String, Integer> p, byte[] s) throws InterruptedException
