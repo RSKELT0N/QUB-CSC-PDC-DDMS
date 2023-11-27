@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 public class Peer
@@ -42,18 +43,30 @@ public class Peer
             }
 
             RoutingTableEntry e = (RoutingTableEntry)in;
-            return this.id == e.id &&
+            return this.id.equals(e.id) &&
                    this.port == e.port &&
                    this.ip_address.equals(e.ip_address);
         }
     }
 
+    public Peer() throws IOException, NoSuchAlgorithmException
+    {
+        DefineUDPSocket();
+        Initialise();
+    }
+
     public Peer(int port) throws IOException, NoSuchAlgorithmException
     {
+        DefineUDPSocket(port);
+        Initialise();
+    }
+
+    private void Initialise() throws UnknownHostException, NoSuchAlgorithmException
+    {
+        this.m_processing = new Semaphore(0);
         this.m_received = new LinkedBlockingQueue<>();
         this.m_m_bits = 4;
 
-        DefineUDPSocket(port);
         String hash_value = InetAddress.getLocalHost().getHostAddress() + ":" + this.m_socket.m_port;
         this.m_id = Lib.SHA1(hash_value, BigInteger.valueOf(1).shiftLeft(m_m_bits));
 
@@ -148,11 +161,34 @@ public class Peer
                 Send(peer.ip_address, peer.port, ("PING" + " " + this.m_id).getBytes());
         }
     }
+    public void FindValue(RoutingTableEntry peer_info, byte[] message) throws IOException, ClassNotFoundException, InterruptedException
+    {
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+        String data_key = message_string_tokens[0];
+    }
+
+    public Optional<String> GetDataItem(BigInteger id)
+    {
+        if(!m_data_table.containsKey(id))
+            return Optional.empty();
+        else return m_data_table.get(id).second.describeConstable();
+    }
+
+    public Optional<String> GetDataItem(String name_id)
+    {
+        for(var data : m_data_table.entrySet())
+        {
+            if(name_id.equals(data.getValue().first))
+                return data.getValue().second.describeConstable();
+        }
+        return Optional.empty();
+    }
 
     public void Close()
     {
         this.m_sender.SetState(false);
         this.m_receiver.SetState(false);
+        this.m_heartbeat.SetState(false);
         this.m_socket.m_socket.close();
     }
 
@@ -388,6 +424,19 @@ public class Peer
         }
     }
 
+    private void DefineUDPSocket() throws SocketException, UnknownHostException
+    {
+        try
+        {
+            this.m_socket = new core.peer.Node();
+        }
+        catch(BindException e)
+        {
+            System.err.println("Ensure the IP address and port is not currently opened (" + InetAddress.getLocalHost().getHostAddress() + ")");
+            System.exit(-1);
+        }
+    }
+
     private void DefineRoutingTable()
     {
         this.m_routing_table = new TreeMap<>();
@@ -406,16 +455,17 @@ public class Peer
         this.m_ping_vector = new TreeMap<>();
     }
 
-    public final BigInteger m_id;
-    public final int m_m_bits;
+    public BigInteger m_id;
+    public int m_m_bits;
     public core.peer.Node m_socket;
     public final int m_heartbeat_interval = 10;
 
+    public Semaphore m_processing;
     public Sender m_sender;
     public Receiver m_receiver;
     public Heartbeat m_heartbeat;
     public NavigableMap<BigInteger, Boolean> m_ping_vector;
     public NavigableMap<BigInteger, Lib.Pair<String, String>> m_data_table;
     public NavigableMap<BigInteger, NavigableMap<BigInteger, RoutingTableEntry>> m_routing_table;
-    private final LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, byte[]>> m_received;
+    private LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, byte[]>> m_received;
 }

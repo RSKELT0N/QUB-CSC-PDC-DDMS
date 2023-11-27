@@ -5,11 +5,19 @@ import java.net.*;
 
 public class Node
 {
-    public Node(int port) throws SocketException
+    public Node() throws SocketException, UnknownHostException
     {
-        this.m_port = port;
-        this.m_ip_address = InetAddress.getLoopbackAddress().getHostAddress();
-        this.m_socket = new DatagramSocket(this.m_port);
+        this.m_socket = new DatagramSocket(0, InetAddress.getLocalHost());
+        this.m_ip_address = m_socket.getLocalAddress().getHostAddress();
+        this.m_port = m_socket.getLocalPort();
+        this.m_socket.setSoTimeout(1000);
+    }
+
+    public Node(int port) throws SocketException, UnknownHostException
+    {
+        this.m_socket = new DatagramSocket(port, InetAddress.getLocalHost());
+        this.m_ip_address = m_socket.getLocalAddress().getHostAddress();
+        this.m_port = m_socket.getLocalPort();
         m_socket.setSoTimeout(1000);
     }
 
