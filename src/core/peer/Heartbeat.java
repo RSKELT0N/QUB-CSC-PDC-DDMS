@@ -21,6 +21,7 @@ class Heartbeat extends Runner
         {
             try
             {
+                Toggle();
                 ExploreCloseNeighbours();
                 PingAllRoutingTable();
                 ShareAllDataItemsToNeighbours();
@@ -36,7 +37,7 @@ class Heartbeat extends Runner
 
     private void ExploreCloseNeighbours() throws InterruptedException
     {
-        Peer.RoutingTableEntry[] close_neighbours = m_peer.GetClosePeers(m_peer.m_id);
+        Peer.RoutingTableEntry[] close_neighbours = m_peer.GetAlphaClosePeers(m_peer.m_id);
         for(var peer : close_neighbours)
         {
             this.m_peer.Send(peer.ip_address, peer.port, ("FIND_NODE_REQUEST" + " " + m_peer.m_id).getBytes());
@@ -48,7 +49,7 @@ class Heartbeat extends Runner
 
         for(var data : m_peer.m_data_table.entrySet())
         {
-            Peer.RoutingTableEntry[] close_peers_to_key = m_peer.GetClosePeers(data.getKey());
+            Peer.RoutingTableEntry[] close_peers_to_key = m_peer.GetAlphaClosePeers(data.getKey());
             for(var peer: close_peers_to_key)
             {
                 m_peer.Send(peer.ip_address, peer.port, ("STORE" + " " + data.getValue().first + "," + data.getValue().second).getBytes());
@@ -63,7 +64,7 @@ class Heartbeat extends Runner
             for(var peer : bucket.getValue().entrySet())
             {
                 m_peer.SetPingStateForPeer(peer.getKey(), false);
-                this.m_peer.Send(peer.getValue().ip_address, peer.getValue().port, ("PING" + " " + m_peer.m_id).getBytes());
+                m_peer.SendPing(peer.getValue().ip_address, peer.getValue().port);
             }
         }
     }

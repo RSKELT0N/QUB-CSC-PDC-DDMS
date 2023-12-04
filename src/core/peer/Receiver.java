@@ -21,10 +21,10 @@ class Receiver extends Runner
         while(this.m_running)
         {
             try {
+                Toggle();
                 DatagramPacket packet = this.m_receiver.ReceivePacket();
                 Lib.Pair<String, Integer> conn = new Lib.Pair<>(packet.getAddress().getHostAddress(), packet.getPort());
                 this.m_receiver_peer.AddReceiveItem(conn, packet.getData());
-
             } catch (SocketTimeoutException e) {
                 continue;
             } catch (IOException | RuntimeException | InterruptedException e) {

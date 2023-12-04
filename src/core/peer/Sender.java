@@ -20,26 +20,23 @@ class Sender extends Runner
     {
         while(this.m_running)
         {
-            Lib.Pair<Lib.Pair<String, Integer>, byte[]> current_item = null;
-            try {
-                current_item = m_queue.poll(1000, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            if(current_item != null)
+            try
             {
-                try
+                Toggle();
+                Lib.Pair<Lib.Pair<String, Integer>, byte[]> current_item = null;
+                current_item = m_queue.poll(1000, TimeUnit.MILLISECONDS);
+
+                if (current_item != null)
                 {
                     String ip_address = current_item.first.first;
                     int port = current_item.first.second;
                     byte[] message = current_item.second;
                     this.m_sender.SendPacket(message, ip_address, port);
                 }
-                catch (IOException e)
-                {
-                    throw new RuntimeException(e);
-                }
+            }
+            catch (IOException | InterruptedException e)
+            {
+                throw new RuntimeException(e);
             }
         }
     }
