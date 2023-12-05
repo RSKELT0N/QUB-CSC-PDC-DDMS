@@ -24,7 +24,7 @@ class Heartbeat extends Runner
                 Toggle();
                 ExploreCloseNeighbours();
                 PingAllRoutingTable();
-//                ShareAllDataItemsToNeighbours();
+                ShareAllDataItemsToNeighbours();
                 Thread.sleep((long) (m_interval * 1e3));
                 RemoveUnRespondedNeighbours();
             }

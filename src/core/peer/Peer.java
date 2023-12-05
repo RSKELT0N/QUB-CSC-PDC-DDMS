@@ -169,13 +169,16 @@ public class Peer
         String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
         assert message_string_tokens.length == 2;
 
-        String[] keys = message_string_tokens[1].split(",");
-
-        for(var key : keys)
+        if(message_string_tokens.length == 2)
         {
-            BigInteger hash = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
+            String[] keys = message_string_tokens[1].split(",");
 
-            m_data_keys.put(hash, key);
+            for(var key : keys)
+            {
+                BigInteger hash = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
+
+                m_data_keys.put(hash, key);
+            }
         }
     }
 
@@ -335,8 +338,8 @@ public class Peer
         {
             SendFindNode(key);
 
-            RoutingTableEntry closest_peer_to_key = GetClosestPeerInRoutingTable(key);
-            Send(closest_peer_to_key.ip_address, closest_peer_to_key.port, (FormatCommand("STORE") + " " + data_id).getBytes(), true);
+            RoutingTableEntry closest_peer_to_key = GetClosePeers(key, m_alpha);
+            Send(closest_peer_to_key.ip_address, closest_peer_to_key.port, (FormatCommand("STORE") + " " + data_id).getBytes(), false);
         }
     }
 
