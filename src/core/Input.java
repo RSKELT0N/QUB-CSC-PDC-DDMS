@@ -33,13 +33,17 @@ public class Input
     private void InitialiseCommands()
     {
         this.m_commands = new HashMap<>();
-        m_commands.put("/help",    new CommandEntry(this::Help,    "Display the necessary information to control the program",      0, "/help"));
-        m_commands.put("/exit",    new CommandEntry(this::Exit,    "Close the peer and exit the program",                           0, "/exit"));
-        m_commands.put("/print",   new CommandEntry(this::Print,   "Will invoke the print function",                                1, "/print"));
-        m_commands.put("/connect", new CommandEntry(this::Connect, "Will connect to bootstrapped node",                             2, "/connect [ip] [port]"));
-        m_commands.put("/clear",   new CommandEntry(this::Clear,   "Will reset the data table within the peer",                     0, "/clear"));
-        m_commands.put("/store",   new CommandEntry(this::Store,   "Store a key/value pair in the distributed system",              2, "/store [key] [value]"));
-        m_commands.put("/get",     new CommandEntry(this::Get,     "Get the value of the respective key in the distributed system", 1, "/get [key]"));
+        m_commands.put("/help",         new CommandEntry(this::Help,       "Display the necessary information to control the program",         0, "/help"));
+        m_commands.put("/exit",         new CommandEntry(this::Exit,       "Close the peer and exit the program",                              0, "/exit"));
+        m_commands.put("/print",        new CommandEntry(this::Print,      "Will invoke the print function",                                   1, "/print [rt/dt/info/idx]"));
+        m_commands.put("/connect",      new CommandEntry(this::Connect,    "Will connect to bootstrapped node",                                2, "/connect [ip] [port]"));
+        m_commands.put("/clear",        new CommandEntry(this::Clear,      "Will reset the data table within the peer",                        0, "/clear"));
+        m_commands.put("/store",        new CommandEntry(this::Store,      "Store a key/value pair in the distributed system",                 2, "/store [key] [value]"));
+        m_commands.put("/get",          new CommandEntry(this::Get,        "Get the value of the respective key in the distributed system",    1, "/get [key]"));
+        m_commands.put("/init",         new CommandEntry(this::Init,       "Initialise the peer, creating its socket and thread for joining.", 0, "/init [opt:nickname] [opt:port]"));
+        m_commands.put("/robot",        new CommandEntry(this::Robot,      "Automated robot option to generate example data in the network.",  1, "/robot [size]"));
+        m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink, "Toggle the connection of the peer to the network.",                0, "/togglelink"));
+        m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,    "Return all known data keys within the network.",                   0, "/getkeys"));
     }
 
     public void ReceiveInput() throws InterruptedException, IOException, NoSuchAlgorithmException
@@ -52,10 +56,14 @@ public class Input
 
             if(command.isPresent())
             {
-                if(command.get().m_argc >= curr_input.split(" ").length - 1)
-                    command.get().m_cmd.Parse(curr_input.split(" "));
+                if((curr_input.split(" ").length - 1) >= command.get().m_argc)
+                {
+                    String[] tokens = curr_input.split(" ");
+                    command.get().m_cmd.Parse(Arrays.copyOfRange(tokens, 1, tokens.length));
+                }
                 else System.out.println("~ Incorrect parameter amount");
-            } else System.out.println("~ unknown command");
+            }
+            else System.out.println("~ unknown command");
         }
         System.out.println("Exiting..");
     }
@@ -74,9 +82,28 @@ public class Input
         System.out.println("~ Prefix with command with '/'\n~ ('/help' for more info)");
     }
 
-    private void Connect(String[] tokens)
+    private void GetKeys(String[] tokens) throws InterruptedException
     {
-        m_kademlia.ConnectToBootStrapped(tokens[1], Integer.parseInt(tokens[2]));
+        if(m_kademlia.GetPeer() != null)
+        {
+            m_kademlia.GetallDataKeys();
+        } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
+    }
+
+    private void ToggleLink(String[] tokens) throws InterruptedException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            this.m_kademlia.ToggleLink();
+        } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
+    }
+
+    private void Connect(String[] tokens) throws IOException, NoSuchAlgorithmException
+    {
+        if(m_kademlia.GetPeer() == null)
+            m_kademlia.InitPeer(RandomLetters(10), 0);
+
+        m_kademlia.ConnectToBootStrapped(tokens[0], Integer.parseInt(tokens[1]));
     }
 
     private void Clear(String[] tokens)
@@ -86,34 +113,89 @@ public class Input
 
     private void Print(String[] tokens)
     {
-        String option;
-        if(tokens.length == 1)
+        if(this.m_kademlia.GetPeer() != null)
         {
-            System.out.println("~ Select option");
-            System.out.println("[rt] - routing table");
-            System.out.println("[dt] - data table");
-            System.out.println("[info] - peer info");
+            String option = tokens[0];
 
-            option = GetInput();
-        } else option = tokens[1];
-
-        switch (option)
-        {
-            case "rt": this.m_kademlia.GetPeer().PrintRoutingTable(); break;
-            case "dt": this.m_kademlia.GetPeer().PrintDataTable(); break;
-            case "info": this.m_kademlia.PrintInfo(); break;
-            default: System.out.println("~ Option not valid"); break;
-        }
+            switch (option) {
+                case "rt":
+                    this.m_kademlia.GetPeer().PrintRoutingTable();
+                    break;
+                case "idx":
+                    this.m_kademlia.GetPeer().PrintIndexTable();
+                    break;
+                case "dt":
+                    this.m_kademlia.GetPeer().PrintDataTable();
+                    break;
+                case "info":
+                    this.m_kademlia.PrintInfo();
+                    break;
+                default:
+                    System.out.println("~ Option not valid");
+                    break;
+            }
+        } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
     }
 
     private void Store(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
     {
-        this.m_kademlia.StoreData(Arrays.copyOfRange(tokens, 1, tokens.length));
+        if(m_kademlia.GetPeer() != null)
+        {
+            this.m_kademlia.StoreData(tokens);
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
+    }
+
+    private void Robot(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            String[] data = new String[2];
+
+            int value_size = Integer.parseInt(tokens[0]);
+            String key = RandomLetters(10);
+            String value = RandomLetters(value_size);
+            data[0] = key;
+            data[1] = value;
+
+            this.m_kademlia.StoreData(data);
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
+    }
+
+    private void Init(String[] tokens) throws NoSuchAlgorithmException, IOException
+    {
+        String nickname = RandomLetters(10);
+        int port = 0;
+
+        switch (tokens.length)
+        {
+            case 1:
+                port = Integer.parseInt(tokens[0]);
+                break;
+            case 2:
+                port = Integer.parseInt(tokens[0]);
+                nickname = CheckValidNickname(tokens[1]);
+                break;
+            default:
+                break;
+        }
+        this.m_kademlia.InitPeer(nickname, port);
+    }
+
+    private String CheckValidNickname(String nick_name)
+    {
+        if(nick_name.length() > 10)
+        {
+            nick_name = nick_name.substring(0, 10);
+        }
+        return nick_name;
     }
 
     private void Get(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
     {
-        this.m_kademlia.GetPeer().GetDataItem(tokens[1]);
+        if(m_kademlia.GetPeer() != null)
+        {
+            this.m_kademlia.GetPeer().GetDataItem(tokens[0]);
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
     private void Help(String[] tokens)
@@ -139,6 +221,18 @@ public class Input
     private Optional<CommandEntry> GetCommandFunction(String in)
     {
         return Optional.ofNullable(m_commands.get(in.split(" ")[0]));
+    }
+
+    private String RandomLetters(int size)
+    {
+        StringBuilder ss = new StringBuilder();
+
+        for(int i = 0; i < size; i++)
+        {
+            char curr = (char) ((Math.random() * ('z' - 'a' + 1)) + 'a');
+            ss.append(curr);
+        }
+        return ss.toString();
     }
 
     private boolean m_alive;

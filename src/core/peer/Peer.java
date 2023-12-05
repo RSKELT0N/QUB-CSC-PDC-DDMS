@@ -64,7 +64,7 @@ public class Peer
         this.m_nickname = nickname;
         this.m_processing = new Semaphore(0);
         this.m_received = new LinkedBlockingQueue<>();
-        this.m_m_bits = 10;
+        this.m_m_bits = 8;
         this.m_alpha = (int)Math.sqrt(m_m_bits);
 
         String hash_value = InetAddress.getLocalHost().getHostAddress() + ":" + this.m_socket.m_port;
@@ -77,7 +77,7 @@ public class Peer
 
     public void DefineSenderAndReceiver()
     {
-        this.m_sender = new Sender(this.GetSocket());
+        this.m_sender = new Sender(this, this.GetSocket());
         this.m_receiver = new Receiver(this);
         this.m_heartbeat = new Heartbeat(this, m_heartbeat_interval);
 
@@ -88,15 +88,19 @@ public class Peer
 
     public void Store(RoutingTableEntry peer_info, byte[] message) throws NoSuchAlgorithmException, InterruptedException
     {
-        String[] key_value_tokens = new String(message, StandardCharsets.UTF_8).replace("\0", "").split(",");
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replace("\0", "").split(" ");
+        assert message_string_tokens.length == 2;
+
+        String[] key_value_tokens = message_string_tokens[1].split(",");
 
         if(key_value_tokens.length == 1)
         {
             String key = key_value_tokens[0];
+            BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
             BigInteger key_hash = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
 
             if(m_data_table.containsKey(key_hash))
-                Send(peer_info.ip_address, peer_info.port, ("STORE" + " " + key + "," + m_data_table.get(key_hash).second).getBytes());
+                Send(peer_info.ip_address, peer_info.port, ("STORE" + ":" + command_count + " " + key + "," + m_data_table.get(key_hash).second).getBytes(), false);
         }
         else if(key_value_tokens.length == 2)
         {
@@ -105,16 +109,19 @@ public class Peer
             String value = key_value_tokens[1];
 
             if(!m_data_table.containsKey(key_hash))
+            {
                 m_data_table.put(key_hash, new Lib.Pair<>(key, value));
+                m_data_keys.put(key_hash, key);
+            }
         }
     }
 
     public void Ping(RoutingTableEntry peer_info, byte[] message) throws InterruptedException
     {
         String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replace("\0", "").split(" ");
-        assert message_string_tokens.length == 1;
+        assert message_string_tokens.length == 2;
 
-        String[] ping_tokens = message_string_tokens[0].split(",");
+        String[] ping_tokens = message_string_tokens[1].split(",");
         String nick_name = ping_tokens[0];
         BigInteger id = new BigInteger(ping_tokens[1]);
 
@@ -125,9 +132,9 @@ public class Peer
     public void Pong(RoutingTableEntry peer_info, byte[] message)
     {
         String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
-        assert message_string_tokens.length == 1;
+        assert message_string_tokens.length == 2;
 
-        String[] ping_tokens = message_string_tokens[0].split(",");
+        String[] ping_tokens = message_string_tokens[1].split(",");
         String nick_name = ping_tokens[0];
         BigInteger id = new BigInteger(ping_tokens[1]);
 
@@ -135,15 +142,54 @@ public class Peer
         SetPingStateForPeer(id, true);
     }
 
-    public void FindNodeRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
+    public void FindKeysRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
     {
         String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
         assert message_string_tokens.length == 1;
-        BigInteger peer_id = new BigInteger(message_string_tokens[0]);
 
-        RoutingTableEntry[] close_peers = GetAlphaClosePeers(peer_id);
+        BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
 
-        byte[] initial_command = ("FIND_NODE_RESPONSE" + " ").getBytes();
+        StringBuilder keys = new StringBuilder();
+
+        var data = m_data_table.firstEntry();
+        for(int i = 0; i < m_data_table.size(); i++)
+        {
+            keys.append(data.getValue().first);
+            data = m_data_table.higherEntry(data.getKey());
+
+            if(i != m_data_table.size() - 1)
+                keys.append(",");
+        }
+
+        Send(peer_info.ip_address, peer_info.port, ("FIND_KEYS_RESPONSE" + ":" + command_count + " " + keys.toString()).getBytes(), false);
+    }
+
+    public void FindKeysResponse(RoutingTableEntry peer_info, byte[] message) throws NoSuchAlgorithmException
+    {
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+        assert message_string_tokens.length == 2;
+
+        String[] keys = message_string_tokens[1].split(",");
+
+        for(var key : keys)
+        {
+            BigInteger hash = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
+
+            m_data_keys.put(hash, key);
+        }
+    }
+
+    public void FindNodeRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
+    {
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+        assert message_string_tokens.length == 2;
+
+        BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
+        BigInteger peer_id = new BigInteger(message_string_tokens[1]);
+
+        RoutingTableEntry[] close_peers = GetClosePeers(peer_id, m_m_bits);
+
+        byte[] initial_command = ("FIND_NODE_RESPONSE" + ":" + command_count + " ").getBytes();
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(out);
@@ -158,12 +204,15 @@ public class Peer
         buff.put(out.toByteArray());
         byte[] combined = buff.array();
 
-        Send(peer_info.ip_address, peer_info.port, combined);
+        Send(peer_info.ip_address, peer_info.port, combined, false);
     }
 
     public void FindNodeResponse(RoutingTableEntry peer_info, byte[] message) throws IOException, ClassNotFoundException, InterruptedException
     {
-        ByteArrayInputStream in = new ByteArrayInputStream(message);
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+        BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
+
+        ByteArrayInputStream in = new ByteArrayInputStream(Arrays.copyOfRange(message, message_string_tokens[0].length() + 1, message.length));
         ObjectInputStream iis = new ObjectInputStream(in);
 
         SendPing(peer_info.ip_address, peer_info.port);
@@ -178,7 +227,7 @@ public class Peer
                 if(!Objects.equals(peer.id, m_id))
                 {
                     SendPing(peer.ip_address, peer.port);
-                    Send(peer.ip_address, peer.port, ("FIND_NODE_REQUEST" + " " + m_id).getBytes());
+                    Send(peer.ip_address, peer.port, ("FIND_NODE_REQUEST" + ":" + command_count + " " + m_id).getBytes(), true);
                 }
             }
         }
@@ -187,12 +236,13 @@ public class Peer
     public void FindValueRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
     {
         String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
-        assert message_string_tokens.length == 1;
-        BigInteger key_id = new BigInteger(message_string_tokens[0]);
+        assert message_string_tokens.length == 2;
 
-        RoutingTableEntry[] close_peers = GetAlphaClosePeers(key_id);
+        BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
+        BigInteger key_id = new BigInteger(message_string_tokens[1]);
+        RoutingTableEntry[] close_peers = GetClosePeers(key_id, m_m_bits);
 
-        byte[] initial_command = ("FIND_VALUE_RESPONSE" + " ").getBytes();
+        byte[] initial_command = ("FIND_VALUE_RESPONSE" + ":" + command_count + " ").getBytes();
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(out);
@@ -207,12 +257,15 @@ public class Peer
         buff.put(out.toByteArray());
         byte[] combined = buff.array();
 
-        Send(peer_info.ip_address, peer_info.port, combined);
+        Send(peer_info.ip_address, peer_info.port, combined, false);
     }
 
     public void FindValueResponse(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException, ClassNotFoundException
     {
-        ByteArrayInputStream in = new ByteArrayInputStream(message);
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+        BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
+
+        ByteArrayInputStream in = new ByteArrayInputStream(Arrays.copyOfRange(message, message_string_tokens[0].length() + 1, message.length));
         ObjectInputStream iis = new ObjectInputStream(in);
 
         SendPing(peer_info.ip_address, peer_info.port);
@@ -227,25 +280,45 @@ public class Peer
                 if(!Objects.equals(peer.id, m_id))
                 {
                     SendPing(peer.ip_address, peer.port);
-                    Send(peer.ip_address, peer.port, ("FIND_VALUE_REQUEST" + " " + m_id).getBytes());
+                    Send(peer.ip_address, peer.port, ("FIND_VALUE_REQUEST" + ":" + command_count + " " + m_id).getBytes(), true);
                 }
             }
         }
     }
 
-    public void SendFindNode(String ip, int port, BigInteger id) throws InterruptedException
+    public void SendFindNode(BigInteger id) throws InterruptedException
     {
-        Send(ip, port, ("FIND_VALUE_REQUEST" + " " + id).getBytes());
+        RoutingTableEntry[] close_peers_to_key = GetClosePeers(id, m_alpha);
+
+        for(var peer : close_peers_to_key)
+            Send(peer.ip_address, peer.port, (FormatCommand("FIND_NODE_REQUEST") + " " + id).getBytes(), true);
+    }
+
+    public void SendFindValue(BigInteger id) throws InterruptedException
+    {
+        RoutingTableEntry[] close_peers_to_key = GetClosePeers(id, m_alpha);
+
+        for(var peer : close_peers_to_key)
+            Send(peer.ip_address, peer.port, (FormatCommand("FIND_VALUE_REQUEST") + " " + id).getBytes(), true);
     }
 
     public void SendPing(String ip, int port) throws InterruptedException
     {
-        Send(ip, port, ("PING" + " " + this.m_nickname + "," + this.m_id).getBytes());
+        Send(ip, port, (FormatCommand("PING") + " " + this.m_nickname + "," + this.m_id).getBytes(), false);
     }
 
     public void SendPong(String ip, int port) throws InterruptedException
     {
-        Send(ip, port, ("PONG" + " " + this.m_nickname + "," + this.m_id).getBytes());
+        Send(ip, port, (FormatCommand("PONG") + " " + this.m_nickname + "," + this.m_id).getBytes(), false);
+    }
+
+    public void ContactAllBuckets() throws InterruptedException
+    {
+        for(int i = 0; i < m_m_bits; i++)
+        {
+            BigInteger bucket = BigInteger.valueOf(1).shiftLeft(i);
+            SendFindNode(bucket);
+        }
     }
 
     public void GetDataItem(String data_id) throws NoSuchAlgorithmException, InterruptedException
@@ -260,14 +333,17 @@ public class Peer
 
         if(value.isEmpty())
         {
-            RoutingTableEntry[] close_peers_to_key = GetAlphaClosePeers(key);
-
-            for(var peer : close_peers_to_key)
-                Send(peer.ip_address, peer.port, ("FIND_VALUE_REQUEST" + " " + key).getBytes());
+            SendFindNode(key);
 
             RoutingTableEntry closest_peer_to_key = GetClosestPeerInRoutingTable(key);
-            Send(closest_peer_to_key.ip_address, closest_peer_to_key.port, ("STORE" + " " + data_id).getBytes());
+            Send(closest_peer_to_key.ip_address, closest_peer_to_key.port, (FormatCommand("STORE") + " " + data_id).getBytes(), true);
         }
+    }
+
+    public String FormatCommand(String command)
+    {
+        BigInteger curr_command = m_sender.GetAndIncrementSendCount();
+        return (command + ":" + curr_command);
     }
 
     public void Close()
@@ -282,15 +358,16 @@ public class Peer
     {
         BigInteger data_key = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
         this.m_data_table.put(data_key, new Lib.Pair<>(key, value));
+        this.m_data_keys.put(data_key, key);
 
-        RoutingTableEntry[] close_peers = GetAlphaClosePeers(data_key);
-        byte[] to_send = ("STORE" + " " + key + "," + value).getBytes();
+        RoutingTableEntry[] close_peers = GetClosePeers(data_key, m_m_bits);
+        byte[] to_send = (FormatCommand("STORE") + " " + key + "," + value).getBytes();
 
         for(var peer : close_peers)
-            Send(peer.ip_address, peer.port, to_send);
+            Send(peer.ip_address, peer.port, to_send, false);
     }
 
-    public Lib.Pair<Lib.Pair<String, Integer>, byte[]> GetNextReceived() throws InterruptedException
+    public Lib.Pair<RoutingTableEntry, byte[]> GetNextReceived() throws InterruptedException
     {
         return this.m_received.poll(1000, TimeUnit.MILLISECONDS);
     }
@@ -300,9 +377,15 @@ public class Peer
         return this.m_socket;
     }
 
-    public void Send(String remote_ip, int remote_port, byte[] message) throws InterruptedException
+    public Lib.Pair<Semaphore, Receiver.Packet> Send(String remote_ip, int remote_port, byte[] message, boolean lock) throws InterruptedException
     {
-        this.m_sender.AddSendItem(new Lib.Pair<>(remote_ip, remote_port), message);
+        this.m_sender.AddSendItem(new RoutingTableEntry(remote_ip, remote_port), message);
+        var packet = this.m_sender.CreateReceivedItem(message);
+
+        if(lock)
+            packet.first.tryAcquire(10, TimeUnit.SECONDS);
+
+        return packet;
     }
 
     public void PrintRoutingTable()
@@ -339,9 +422,26 @@ public class Peer
         System.out.println("---------------");
     }
 
-    public void AddReceiveItem(Lib.Pair<String, Integer> r, byte[] s) throws InterruptedException
+    public void PrintIndexTable()
     {
-        this.m_received.put(new Lib.Pair<>(new Lib.Pair<>(r.first, r.second), s));
+        System.out.println("Peer (" + m_nickname + ":" + m_id + ") index table\n---------------");
+
+        if(m_data_keys.isEmpty())
+        {
+            System.out.println("No index entries");
+            return;
+        }
+
+        for(var data : m_data_keys.entrySet())
+        {
+            System.out.println(data.getKey() + "(" + data.getValue() + ")");
+        }
+        System.out.println("---------------");
+    }
+
+    public void AddReceiveItem(RoutingTableEntry r, byte[] s) throws InterruptedException
+    {
+        this.m_received.put(new Lib.Pair<>(r, s));
     }
 
     public void SetPingStateForPeer(BigInteger peer_id, boolean state)
@@ -365,10 +465,10 @@ public class Peer
         this.m_ping_vector.remove(peer_id);
     }
 
-    public RoutingTableEntry[] GetAlphaClosePeers(BigInteger peer_id)
+    public RoutingTableEntry[] GetClosePeers(BigInteger peer_id, int amt)
     {
         BigInteger total = GetTotalPeersInRoutingTable(peer_id);
-        boolean take_all = total.compareTo(BigInteger.valueOf(this.m_alpha)) <= 0;
+        boolean take_all = total.compareTo(BigInteger.valueOf(amt)) <= 0;
 
         ArrayList<RoutingTableEntry> all_peers = new ArrayList<>();
         ArrayList<RoutingTableEntry> remaining_peers = new ArrayList<>();
@@ -386,9 +486,9 @@ public class Peer
         }
 
         // Get remaining peers based on closest to equal total.
-        if(!take_all && all_peers.size() < m_alpha)
+        if(!take_all && all_peers.size() < amt)
         {
-            int diff = Math.abs(all_peers.size() - m_alpha);
+            int diff = Math.abs(all_peers.size() - amt);
 
             while(diff > 0)
             {
@@ -511,7 +611,7 @@ public class Peer
         m_ping_vector.put(peer_id, true);
     }
 
-    private void DefineUDPSocket(int port) throws SocketException, UnknownHostException
+    private void DefineUDPSocket(int port) throws UnknownHostException
     {
         try
         {
@@ -521,6 +621,8 @@ public class Peer
         {
             System.err.println("Ensure the IP address and port is not currently opened (" + InetAddress.getLocalHost().getHostAddress() + ")");
             System.exit(-1);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -535,6 +637,7 @@ public class Peer
     private void DefineDataTable()
     {
         this.m_data_table = new TreeMap<>();
+        this.m_data_keys = new HashMap<>();
     }
 
     private void DefinePingVector()
@@ -555,6 +658,7 @@ public class Peer
     public Heartbeat m_heartbeat;
     public NavigableMap<BigInteger, Boolean> m_ping_vector;
     public NavigableMap<BigInteger, Lib.Pair<String, String>> m_data_table;
+    public HashMap<BigInteger, String> m_data_keys;
     public NavigableMap<BigInteger, NavigableMap<BigInteger, RoutingTableEntry>> m_routing_table;
-    private LinkedBlockingQueue<Lib.Pair<Lib.Pair<String, Integer>, byte[]>> m_received;
+    private LinkedBlockingQueue<Lib.Pair<RoutingTableEntry, byte[]>> m_received;
 }

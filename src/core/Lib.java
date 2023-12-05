@@ -33,14 +33,4 @@ public class Lib
 
         return new BigInteger(hexString.toString(), 16).mod(mod);
     }
-
-    static public String FormatBytes(byte[] bytes, int length)
-    {
-        StringBuilder ret = new StringBuilder();
-        for(int i = 0; i < length; i++)
-        {
-            ret.append((char)bytes[i]);
-        }
-        return ret.toString();
-    }
 }

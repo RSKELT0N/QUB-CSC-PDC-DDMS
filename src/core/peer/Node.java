@@ -1,14 +1,21 @@
 package core.peer;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.*;
 
 public class Node
 {
-    public Node(int port) throws SocketException, UnknownHostException
+    public Node(int port) throws IOException
     {
-        this.m_socket = new DatagramSocket(port, InetAddress.getLocalHost());
-        this.m_ip_address = m_socket.getLocalAddress().getHostAddress();
+//        String command = "curl -X GET http://xml.purplepixie.org/apps/ipaddress/?format=plain";
+//        ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+//        Process process = processBuilder.start();
+//        InputStream ip = process.getInputStream();
+//        String ip_str = new String(ip.readAllBytes());
+
+        this.m_socket = new DatagramSocket(port);
+        this.m_ip_address = InetAddress.getLocalHost().getHostAddress();
         this.m_port = m_socket.getLocalPort();
         m_socket.setSoTimeout(1000);
     }

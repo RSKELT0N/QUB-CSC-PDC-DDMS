@@ -3,16 +3,35 @@ package core.peer;
 import core.Lib;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
+import java.util.HashMap;
+import java.util.concurrent.Semaphore;
 
 class Receiver extends Runner
 {
+    public class Packet
+    {
+        public HashMap<Peer.RoutingTableEntry, byte[]> m_payloads;
+
+        Packet()
+        {
+            this.m_payloads = new HashMap<>();
+        }
+
+        public void AddPayload(Peer.RoutingTableEntry conn, byte[] payload)
+        {
+            m_payloads.put(conn, payload);
+        }
+    }
+
     Receiver(Peer receive_peer)
     {
         super();
         this.m_receiver_peer = receive_peer;
         this.m_receiver = receive_peer.GetSocket();
+        this.m_received = new HashMap<>();
     }
 
     @Override
@@ -23,8 +42,9 @@ class Receiver extends Runner
             try {
                 Toggle();
                 DatagramPacket packet = this.m_receiver.ReceivePacket();
-                Lib.Pair<String, Integer> conn = new Lib.Pair<>(packet.getAddress().getHostAddress(), packet.getPort());
-                this.m_receiver_peer.AddReceiveItem(conn, packet.getData());
+                Peer.RoutingTableEntry conn = new Peer.RoutingTableEntry(packet.getAddress().getHostAddress(), packet.getPort());
+                AddPayload(conn, packet.getData());
+                m_receiver_peer.AddReceiveItem(conn, packet.getData());
             } catch (SocketTimeoutException e) {
                 continue;
             } catch (IOException | RuntimeException | InterruptedException e) {
@@ -33,6 +53,35 @@ class Receiver extends Runner
         }
     }
 
+    public void AddReceivedItem(BigInteger command_count)
+    {
+        if(!(m_received.containsKey(command_count)))
+        {
+            m_received.put(command_count, new Lib.Pair<>(new Semaphore(0), new Packet()));
+        }
+    }
+
+    public HashMap<BigInteger, Lib.Pair<Semaphore, Packet>> GetReceivedPackets()
+    {
+        return m_received;
+    }
+
+    private void AddPayload(Peer.RoutingTableEntry conn, byte[] payload)
+    {
+        String[] tokens = new String(payload).replace("\0", "").split(" ");
+        BigInteger command_count = new BigInteger(tokens[0].split(":")[1]);
+
+        if(m_received.containsKey(command_count))
+        {
+            if (m_received.get(command_count).first.getQueueLength() == 1)
+            {
+                m_received.get(command_count).first.release();
+            }
+            m_received.get(command_count).second.AddPayload(conn, payload);
+        }
+    }
+
+    private HashMap<BigInteger, Lib.Pair<Semaphore, Packet>> m_received;
     private core.peer.Node m_receiver;
     private Peer m_receiver_peer;
 }
