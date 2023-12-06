@@ -45,7 +45,6 @@ class Receiver extends Runner
                 Toggle();
                 DatagramPacket packet = this.m_receiver.ReceivePacket();
                 Peer.RoutingTableEntry conn = new Peer.RoutingTableEntry(packet.getAddress().getHostAddress(), packet.getPort());
-                String tmp = new String(packet.getData(), StandardCharsets.UTF_8).replaceAll("\0", "");
 
                 InsertValidPacket(conn, packet.getData());
             } catch (SocketTimeoutException e) {

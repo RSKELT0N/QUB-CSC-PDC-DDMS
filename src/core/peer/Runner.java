@@ -1,7 +1,6 @@
 package core.peer;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
 public abstract class Runner implements Runnable
@@ -55,5 +54,5 @@ public abstract class Runner implements Runnable
     protected Semaphore m_togglelink;
 
     protected boolean m_running;
-    protected final int MAGIC_VALUE = 0x3333FFFF;
+    protected final int MAGIC_VALUE = 0xF00DB33F;
 }

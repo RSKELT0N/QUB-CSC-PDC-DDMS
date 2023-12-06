@@ -105,9 +105,10 @@ public class Peer
         }
         else if(key_value_tokens.length == 2)
         {
+
             String key = key_value_tokens[0];
             BigInteger key_hash = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
-            String value = key_value_tokens[1];
+            String value = new String(message, StandardCharsets.UTF_8).replace("\0", "").split(",")[1];
 
             if(!m_data_table.containsKey(key_hash))
             {

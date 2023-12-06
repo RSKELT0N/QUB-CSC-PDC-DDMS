@@ -56,11 +56,8 @@ public class Kademlia implements Remote, Runnable
         System.out.println("----------------");
     }
 
-    public void StoreData(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
+    public void StoreData(String key, String value) throws NoSuchAlgorithmException, InterruptedException
     {
-        String key = tokens[0];
-        String value = tokens[1];
-
         m_peer.AddDataItem(key, value);
     }
 

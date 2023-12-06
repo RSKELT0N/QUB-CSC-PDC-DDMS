@@ -1,6 +1,9 @@
 package core;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
@@ -33,17 +36,18 @@ public class Input
     private void InitialiseCommands()
     {
         this.m_commands = new HashMap<>();
-        m_commands.put("/help",         new CommandEntry(this::Help,       "Display the necessary information to control the program",             0, "/help"));
-        m_commands.put("/exit",         new CommandEntry(this::Exit,       "Close the peer and exit the program",                                  0, "/exit"));
-        m_commands.put("/print",        new CommandEntry(this::Print,      "Will invoke the print function",                                       1, "/print [rt/dt/info/idx]"));
-        m_commands.put("/connect",      new CommandEntry(this::Connect,    "Will connect to bootstrapped node if specified, otherwise broadcast.", 0, "/connect opt:[ [ip] [port] ]"));
-        m_commands.put("/clear",        new CommandEntry(this::Clear,      "Will reset the data table within the peer",                            0, "/clear"));
-        m_commands.put("/store",        new CommandEntry(this::Store,      "Store a key/value pair in the distributed system",                     2, "/store [key] [value]"));
-        m_commands.put("/get",          new CommandEntry(this::Get,        "Get the value of the respective key in the distributed system",        1, "/get [key]"));
-        m_commands.put("/init",         new CommandEntry(this::Init,       "Initialise the peer, creating its socket and thread for joining.",     0, "/init [opt:nickname] [opt:port]"));
-        m_commands.put("/robot",        new CommandEntry(this::Robot,      "Automated robot option to generate example data in the network.",      1, "/robot [size]"));
-        m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink, "Toggle the connection of the peer to the network.",                    0, "/togglelink"));
-        m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,    "Return all known data keys within the network.",                       0, "/getkeys"));
+        m_commands.put("/help",         new CommandEntry(this::Help,         "Display the necessary information to control the program",             0, "/help"));
+        m_commands.put("/exit",         new CommandEntry(this::Exit,         "Close the peer and exit the program",                                  0, "/exit"));
+        m_commands.put("/print",        new CommandEntry(this::Print,        "Will invoke the print function",                                       1, "/print [rt/dt/info/idx]"));
+        m_commands.put("/connect",      new CommandEntry(this::Connect,      "Will connect to bootstrapped node if specified, otherwise broadcast.", 0, "/connect opt:[ [ip] [port] ]"));
+        m_commands.put("/clear",        new CommandEntry(this::Clear,        "Will reset the data table within the peer",                            0, "/clear"));
+        m_commands.put("/store",        new CommandEntry(this::Store,        "Store a key/value pair in the distributed system",                     2, "/store [key] [value]"));
+        m_commands.put("/get",          new CommandEntry(this::Get,          "Get the value of the respective key in the distributed system",        1, "/get [key]"));
+        m_commands.put("/init",         new CommandEntry(this::Init,         "Initialise the peer, creating its socket and thread for joining.",     0, "/init [opt:nickname] [opt:port]"));
+        m_commands.put("/robot",        new CommandEntry(this::Robot,        "Automated robot option to generate example data in the network.",      1, "/robot [size]"));
+        m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink,   "Toggle the connection of the peer to the network.",                    0, "/togglelink"));
+        m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,      "Return all known data keys within the network.",                       0, "/getkeys"));
+        m_commands.put("/storeweather", new CommandEntry(this::StoreWeather, "Stores the current weather of the passed city.",                       1, "/storeweather [city]"));
     }
 
     public void ReceiveInput() throws InterruptedException, IOException, NoSuchAlgorithmException
@@ -144,7 +148,28 @@ public class Input
     {
         if(m_kademlia.GetPeer() != null)
         {
-            this.m_kademlia.StoreData(tokens);
+            String key = tokens[0];
+            String value = String.join(" ", Arrays.copyOfRange(tokens, 1, tokens.length));
+            this.m_kademlia.StoreData(key, value);
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
+    }
+
+    private void StoreWeather(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            String city = String.join(" ", tokens);
+            String apiUrl = "wttr.in/" + city.replace(" ", "%20") + "?format=%l:%20(Temp)+%t%20(Wind)+%w%20(Humidity)+%h";
+
+            ProcessBuilder processBuilder = new ProcessBuilder("curl", "-s", apiUrl);
+            processBuilder.redirectErrorStream(true);
+
+            Process process = processBuilder.start();
+            InputStream reader = process.getInputStream();
+
+            String result = new String(reader.readAllBytes());
+
+            this.m_kademlia.StoreData(city, result);
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
@@ -152,15 +177,11 @@ public class Input
     {
         if(m_kademlia.GetPeer() != null)
         {
-            String[] data = new String[2];
-
             int value_size = Integer.parseInt(tokens[0]);
             String key = RandomLetters(10);
             String value = RandomLetters(value_size);
-            data[0] = key;
-            data[1] = value;
 
-            this.m_kademlia.StoreData(data);
+            this.m_kademlia.StoreData(key, value);
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
