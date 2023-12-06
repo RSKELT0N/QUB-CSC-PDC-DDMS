@@ -33,17 +33,17 @@ public class Input
     private void InitialiseCommands()
     {
         this.m_commands = new HashMap<>();
-        m_commands.put("/help",         new CommandEntry(this::Help,       "Display the necessary information to control the program",         0, "/help"));
-        m_commands.put("/exit",         new CommandEntry(this::Exit,       "Close the peer and exit the program",                              0, "/exit"));
-        m_commands.put("/print",        new CommandEntry(this::Print,      "Will invoke the print function",                                   1, "/print [rt/dt/info/idx]"));
-        m_commands.put("/connect",      new CommandEntry(this::Connect,    "Will connect to bootstrapped node",                                2, "/connect [ip] [port]"));
-        m_commands.put("/clear",        new CommandEntry(this::Clear,      "Will reset the data table within the peer",                        0, "/clear"));
-        m_commands.put("/store",        new CommandEntry(this::Store,      "Store a key/value pair in the distributed system",                 2, "/store [key] [value]"));
-        m_commands.put("/get",          new CommandEntry(this::Get,        "Get the value of the respective key in the distributed system",    1, "/get [key]"));
-        m_commands.put("/init",         new CommandEntry(this::Init,       "Initialise the peer, creating its socket and thread for joining.", 0, "/init [opt:nickname] [opt:port]"));
-        m_commands.put("/robot",        new CommandEntry(this::Robot,      "Automated robot option to generate example data in the network.",  1, "/robot [size]"));
-        m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink, "Toggle the connection of the peer to the network.",                0, "/togglelink"));
-        m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,    "Return all known data keys within the network.",                   0, "/getkeys"));
+        m_commands.put("/help",         new CommandEntry(this::Help,       "Display the necessary information to control the program",             0, "/help"));
+        m_commands.put("/exit",         new CommandEntry(this::Exit,       "Close the peer and exit the program",                                  0, "/exit"));
+        m_commands.put("/print",        new CommandEntry(this::Print,      "Will invoke the print function",                                       1, "/print [rt/dt/info/idx]"));
+        m_commands.put("/connect",      new CommandEntry(this::Connect,    "Will connect to bootstrapped node if specified, otherwise broadcast.", 0, "/connect opt:[ [ip] [port] ]"));
+        m_commands.put("/clear",        new CommandEntry(this::Clear,      "Will reset the data table within the peer",                            0, "/clear"));
+        m_commands.put("/store",        new CommandEntry(this::Store,      "Store a key/value pair in the distributed system",                     2, "/store [key] [value]"));
+        m_commands.put("/get",          new CommandEntry(this::Get,        "Get the value of the respective key in the distributed system",        1, "/get [key]"));
+        m_commands.put("/init",         new CommandEntry(this::Init,       "Initialise the peer, creating its socket and thread for joining.",     0, "/init [opt:nickname] [opt:port]"));
+        m_commands.put("/robot",        new CommandEntry(this::Robot,      "Automated robot option to generate example data in the network.",      1, "/robot [size]"));
+        m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink, "Toggle the connection of the peer to the network.",                    0, "/togglelink"));
+        m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,    "Return all known data keys within the network.",                       0, "/getkeys"));
     }
 
     public void ReceiveInput() throws InterruptedException, IOException, NoSuchAlgorithmException
@@ -90,7 +90,7 @@ public class Input
         } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
     }
 
-    private void ToggleLink(String[] tokens) throws InterruptedException
+    private void ToggleLink(String[] tokens)
     {
         if(m_kademlia.GetPeer() != null)
         {
@@ -98,12 +98,15 @@ public class Input
         } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
     }
 
-    private void Connect(String[] tokens) throws IOException, NoSuchAlgorithmException
+    private void Connect(String[] tokens) throws IOException, NoSuchAlgorithmException, InterruptedException
     {
         if(m_kademlia.GetPeer() == null)
             m_kademlia.InitPeer(RandomLetters(10), 0);
 
-        m_kademlia.ConnectToBootStrapped(tokens[0], Integer.parseInt(tokens[1]));
+        if(tokens.length == 2)
+        {
+            m_kademlia.ConnectToBootStrapped(tokens[0], Integer.parseInt(tokens[1]));
+        } else m_kademlia.ConnectThroughBroadcast();
     }
 
     private void Clear(String[] tokens)
@@ -169,11 +172,11 @@ public class Input
         switch (tokens.length)
         {
             case 1:
-                port = Integer.parseInt(tokens[0]);
+                nickname = CheckValidNickname(tokens[0]);
                 break;
             case 2:
-                port = Integer.parseInt(tokens[0]);
-                nickname = CheckValidNickname(tokens[1]);
+                nickname = CheckValidNickname(tokens[0]);
+                port = Integer.parseInt(tokens[1]);
                 break;
             default:
                 break;
@@ -203,7 +206,7 @@ public class Input
         System.out.println("Commands\n----------");
         for(var command : m_commands.entrySet())
         {
-            System.out.format("~ %-8s (%d) - %-65s | %s\n", command.getKey(), command.getValue().m_argc, command.getValue().m_desc, command.getValue().m_exp);
+            System.out.format("~ %-15s (%d) - %-70s | %s\n", command.getKey(), command.getValue().m_argc, command.getValue().m_desc, command.getValue().m_exp);
         }
     }
 

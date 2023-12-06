@@ -59,15 +59,16 @@ public class Peer
         Initialise(nickname);
     }
 
-    private void Initialise(String nickname) throws UnknownHostException, NoSuchAlgorithmException
+    private void Initialise(String nickname) throws NoSuchAlgorithmException
     {
+        this.m_connected = false;
         this.m_nickname = nickname;
         this.m_processing = new Semaphore(0);
         this.m_received = new LinkedBlockingQueue<>();
         this.m_m_bits = 8;
         this.m_alpha = (int)Math.sqrt(m_m_bits);
 
-        String hash_value = InetAddress.getLocalHost().getHostAddress() + ":" + this.m_socket.m_port;
+        String hash_value = m_socket.m_ip_address + ":" + m_socket.m_port;
         this.m_id = Lib.SHA1(hash_value, BigInteger.valueOf(1).shiftLeft(m_m_bits));
 
         DefineRoutingTable();
@@ -140,6 +141,13 @@ public class Peer
 
         InsertPeerIntoRoutingTable(nick_name, id, peer_info.ip_address, peer_info.port);
         SetPingStateForPeer(id, true);
+
+        if(!m_connected)
+        {
+            this.m_bootstrapped_ip = peer_info.ip_address;
+            this.m_bootstrapped_port = peer_info.port;
+            this.m_connected = true;
+        }
     }
 
     public void FindKeysRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
@@ -161,7 +169,7 @@ public class Peer
                 keys.append(",");
         }
 
-        Send(peer_info.ip_address, peer_info.port, ("FIND_KEYS_RESPONSE" + ":" + command_count + " " + keys.toString()).getBytes(), false);
+        Send(peer_info.ip_address, peer_info.port, ("FIND_KEYS_RESPONSE" + ":" + command_count + " " + keys).getBytes(), false);
     }
 
     public void FindKeysResponse(RoutingTableEntry peer_info, byte[] message) throws NoSuchAlgorithmException
@@ -289,6 +297,17 @@ public class Peer
         }
     }
 
+    public void JoinThroughPeer(String boot_ip, int boot_port) throws InterruptedException
+    {
+        Send(boot_ip, boot_port, (FormatCommand("FIND_NODE_REQUEST") + " " + m_id).getBytes(), true);
+    }
+
+    public void JoinThroughBroadcast() throws IOException, InterruptedException
+    {
+        byte[] broadcast_join_message = (FormatCommand("FIND_NODE_REQUEST") + " " + m_id).getBytes();
+        m_sender.AddSendItem(null, broadcast_join_message);
+    }
+
     public void SendFindNode(BigInteger id) throws InterruptedException
     {
         RoutingTableEntry[] close_peers_to_key = GetClosePeers(id, m_alpha);
@@ -338,8 +357,10 @@ public class Peer
         {
             SendFindNode(key);
 
-            RoutingTableEntry closest_peer_to_key = GetClosePeers(key, m_alpha);
-            Send(closest_peer_to_key.ip_address, closest_peer_to_key.port, (FormatCommand("STORE") + " " + data_id).getBytes(), false);
+            RoutingTableEntry[] closest_peers_to_key = GetClosePeers(key, m_alpha);
+
+            for(var peer : closest_peers_to_key)
+                Send(peer.ip_address, peer.port, (FormatCommand("STORE") + " " + data_id).getBytes(), false);
         }
     }
 
@@ -609,9 +630,12 @@ public class Peer
 
     private void InsertPeerIntoRoutingTable(String nick_name, BigInteger peer_id, String remote_ip, int remote_port)
     {
-        BigInteger bucket = DetermineBucket(peer_id);
-        this.m_routing_table.get(bucket).put(peer_id, new RoutingTableEntry(nick_name, peer_id, remote_ip, remote_port));
-        m_ping_vector.put(peer_id, true);
+        if(!Objects.equals(peer_id, m_id))
+        {
+            BigInteger bucket = DetermineBucket(peer_id);
+            this.m_routing_table.get(bucket).put(peer_id, new RoutingTableEntry(nick_name, peer_id, remote_ip, remote_port));
+            m_ping_vector.put(peer_id, true);
+        }
     }
 
     private void DefineUDPSocket(int port) throws UnknownHostException
@@ -654,6 +678,9 @@ public class Peer
     public core.peer.Node m_socket;
     public final int m_heartbeat_interval = 10;
 
+    public boolean m_connected;
+    public String m_bootstrapped_ip;
+    public int m_bootstrapped_port;
     public String m_nickname;
     public Semaphore m_processing;
     public Sender m_sender;

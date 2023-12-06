@@ -32,10 +32,21 @@ class Sender extends Runner
 
                 if (current_item != null)
                 {
-                    String ip_address = current_item.first.ip_address;
-                    int port = current_item.first.port;
-                    byte[] message = current_item.second;
-                    this.m_sender.SendPacket(message, ip_address, port);
+                    if(current_item.first != null)
+                    {
+                        // Join by known IP
+                        String ip_address = current_item.first.ip_address;
+                        int port = current_item.first.port;
+                        byte[] message = AddMagicValuePrefix(current_item.second);
+                        this.m_sender.SendPacket(message, ip_address, port);
+                    } else
+                    {
+                        // Join by unknown IP (broadcast)
+                        m_peer.m_socket.m_socket.setBroadcast(true);
+                        byte[] message = AddMagicValuePrefix(current_item.second);
+                        this.m_sender.SendPacket(message, "255.255.255.255", m_peer.m_socket.DEFAULT_PORT);
+                        m_peer.m_socket.m_socket.setBroadcast(false);
+                    }
                 }
             }
             catch (IOException | InterruptedException e)

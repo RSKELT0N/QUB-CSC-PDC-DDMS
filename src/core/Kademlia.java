@@ -16,16 +16,17 @@ public class Kademlia implements Remote, Runnable
     public Kademlia()
     {
         this.m_peer = null;
-        this.m_bootstrapped = false;
         this.m_state = 0;
     }
 
-    public void ConnectToBootStrapped(String bootstrapped_ip, int bootstrapped_port)
+    public void ConnectToBootStrapped(String bootstrapped_ip, int bootstrapped_port) throws InterruptedException
     {
-        this.m_state = 1;
-        this.m_bootstrapped = true;
-        this.m_bootstrapped_ip = bootstrapped_ip;
-        this.m_bootstrapped_port = bootstrapped_port;
+        m_peer.JoinThroughPeer(bootstrapped_ip, bootstrapped_port);
+    }
+
+    public void ConnectThroughBroadcast() throws IOException, InterruptedException
+    {
+        m_peer.JoinThroughBroadcast();
     }
 
     private void DefineCommands()
@@ -50,8 +51,8 @@ public class Kademlia implements Remote, Runnable
         System.out.format("%-25s [%d]\n", "Peer ID:", m_peer.m_id);
         System.out.format("%-25s [%s]\n", "Socket IP Address:", m_peer.m_socket.m_ip_address);
         System.out.format("%-25s [%d]\n", "Socket Port:", m_peer.m_socket.m_port);
-        System.out.format("%-25s [%s]\n", "Bootstrapped IP Address:", (this.m_bootstrapped_ip == null) ? "" : this.m_bootstrapped_ip);
-        System.out.format("%-25s [%s]\n", "Bootstrapped Port:", (this.m_bootstrapped_port == 0) ? "" : String.valueOf(this.m_bootstrapped_port));
+        System.out.format("%-25s [%s]\n", "Bootstrapped IP Address:", (m_peer.m_bootstrapped_ip == null) ? "" : m_peer.m_bootstrapped_ip);
+        System.out.format("%-25s [%s]\n", "Bootstrapped Port:", (m_peer.m_bootstrapped_port == 0) ? "" : String.valueOf(m_peer.m_bootstrapped_port));
         System.out.println("----------------");
     }
 
@@ -68,41 +69,30 @@ public class Kademlia implements Remote, Runnable
         try
         {
             Lib.Pair<Peer.RoutingTableEntry, byte[]> current_input = null;
-            while (m_peer != null) {
-                switch (this.m_state) {
-                    case 0: {
+            while (m_peer != null)
+            {
+                switch (this.m_state)
+                {
+                    case 0:
                         current_input = m_peer.GetNextReceived();
-
-                        if(!m_bootstrapped)
-                            this.m_state = (current_input == null) ? 0 : 2;
+                        this.m_state = (current_input == null) ? 0 : 2;
                         break;
-                    }
-                    case 1: {
-                        m_peer.Send(this.m_bootstrapped_ip, this.m_bootstrapped_port, (m_peer.FormatCommand("FIND_NODE_REQUEST") + " " + m_peer.m_id).getBytes(), true);
-                        this.m_state = 0;
-                        this.m_bootstrapped = false;
-                        break;
-                    }
-                    case 2: {
-                        assert current_input != null;
+                    case 2:
                         HandleCommand(current_input);
-                        this.m_state = 0;
-                        break;
-                    }
+                        this.m_state = 0; break;
                 }
             }
         }
         catch (Exception e)
         {
-            System.out.println("Error: " + e.toString() + "\n\n"  + "Stacktrace: " + Arrays.toString(e.getStackTrace()));
+            System.out.println("Error: " + e + "\n\n"  + "Stacktrace: " + Arrays.toString(e.getStackTrace()));
         }
     }
 
-    private void HandleCommand(Lib.Pair<Peer.RoutingTableEntry, byte[]> request) throws IOException, InterruptedException, ClassNotFoundException, NoSuchAlgorithmException
+    private void HandleCommand(Lib.Pair<Peer.RoutingTableEntry, byte[]> request) throws IOException, InterruptedException, NoSuchAlgorithmException
     {
         String[] tokens = new String(request.second).replace("\0", "").split(" ");
         String command_str = tokens[0].split(":")[0];
-        BigInteger command_count = new BigInteger(tokens[0].split(":")[1]);
 
         int port = request.first.port;
         InetAddress ip_address = InetAddress.getByName(request.first.ip_address);
@@ -110,7 +100,7 @@ public class Kademlia implements Remote, Runnable
         if(!this.m_commands.containsKey(command_str))
         {
             this.CloseRemotePeer(new Lib.Pair<>(ip_address.getHostAddress(), port));
-            this.m_peer.RemovePeerFromRoutingTable(Lib.SHA1(new String(ip_address + ":" + port), BigInteger.valueOf(1).shiftLeft(m_peer.m_m_bits)));
+            this.m_peer.RemovePeerFromRoutingTable(Lib.SHA1(ip_address + ":" + port, BigInteger.valueOf(1).shiftLeft(m_peer.m_m_bits)));
         }
         else
         {
@@ -179,10 +169,7 @@ public class Kademlia implements Remote, Runnable
         return m_peer;
     }
 
-    private boolean m_bootstrapped;
     private int m_state;
     private Peer m_peer;
-    private String m_bootstrapped_ip;
-    private int m_bootstrapped_port;
     private HashMap<String, RPC> m_commands;
 }

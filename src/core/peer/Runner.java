@@ -1,5 +1,7 @@
 package core.peer;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
 public abstract class Runner implements Runnable
@@ -31,10 +33,27 @@ public abstract class Runner implements Runnable
         }
     }
 
+    protected byte[] AddMagicValuePrefix(byte[] bytes)
+    {
+        ByteBuffer buffer = ByteBuffer.allocate(bytes.length + Integer.BYTES);
+        buffer.put(IntToByteArray(MAGIC_VALUE));
+        buffer.put(bytes);
+        return buffer.array();
+    }
+
+    protected static byte[] IntToByteArray(int value) {
+        return new byte[] {
+                (byte)(value >>> 24),
+                (byte)(value >>> 16),
+                (byte)(value >>> 8),
+                (byte)value};
+    }
+
     @Override
     public abstract void run();
     protected boolean m_toggled;
     protected Semaphore m_togglelink;
 
     protected boolean m_running;
+    protected final int MAGIC_VALUE = 0x3333FFFF;
 }

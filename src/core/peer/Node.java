@@ -1,20 +1,21 @@
 package core.peer;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.*;
 
 public class Node
 {
     public Node(int port) throws IOException
     {
-//        String command = "curl -X GET http://xml.purplepixie.org/apps/ipaddress/?format=plain";
-//        ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
-//        Process process = processBuilder.start();
-//        InputStream ip = process.getInputStream();
-//        String ip_str = new String(ip.readAllBytes());
+        try {
+            this.m_socket = new DatagramSocket(DEFAULT_PORT);
+        } catch (SocketException se) {
 
-        this.m_socket = new DatagramSocket(port);
+            if(port != DEFAULT_PORT)
+                this.m_socket = new DatagramSocket(port);
+            else this.m_socket = new DatagramSocket(RANDOM_PORT);
+        }
+
         this.m_ip_address = InetAddress.getLocalHost().getHostAddress();
         this.m_port = m_socket.getLocalPort();
         m_socket.setSoTimeout(1000);
@@ -53,5 +54,7 @@ public class Node
     public int m_port;
     public String m_ip_address;
     public DatagramSocket m_socket;
+    public final int DEFAULT_PORT = 52222;
+    private final int RANDOM_PORT = 0;
     private final int MAX_RECEIVE_SIZE = 1<<16;
 }

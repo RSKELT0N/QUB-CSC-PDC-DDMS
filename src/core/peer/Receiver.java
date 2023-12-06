@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.Semaphore;
 
@@ -43,8 +45,9 @@ class Receiver extends Runner
                 Toggle();
                 DatagramPacket packet = this.m_receiver.ReceivePacket();
                 Peer.RoutingTableEntry conn = new Peer.RoutingTableEntry(packet.getAddress().getHostAddress(), packet.getPort());
-                AddPayload(conn, packet.getData());
-                m_receiver_peer.AddReceiveItem(conn, packet.getData());
+                String tmp = new String(packet.getData(), StandardCharsets.UTF_8).replaceAll("\0", "");
+
+                InsertValidPacket(conn, packet.getData());
             } catch (SocketTimeoutException e) {
                 continue;
             } catch (IOException | RuntimeException | InterruptedException e) {
@@ -64,6 +67,19 @@ class Receiver extends Runner
     public HashMap<BigInteger, Lib.Pair<Semaphore, Packet>> GetReceivedPackets()
     {
         return m_received;
+    }
+
+    private void InsertValidPacket(Peer.RoutingTableEntry conn, byte[] payload) throws InterruptedException
+    {
+        byte[] prefix = Arrays.copyOf(payload, 4);
+        byte[] magic_byte = IntToByteArray(MAGIC_VALUE);
+
+        if(Arrays.equals(prefix, magic_byte))
+        {
+            byte[] packet = Arrays.copyOfRange(payload, 4, payload.length);
+            AddPayload(conn, packet);
+            m_receiver_peer.AddReceiveItem(conn, packet);
+        }
     }
 
     private void AddPayload(Peer.RoutingTableEntry conn, byte[] payload)
