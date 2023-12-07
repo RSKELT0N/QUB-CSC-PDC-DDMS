@@ -2,6 +2,7 @@ package core.peer;
 
 import core.Lib;
 
+import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
 
 class Heartbeat extends Runner
@@ -28,7 +29,7 @@ class Heartbeat extends Runner
                 Thread.sleep((long) (m_interval * 1e3));
                 RemoveUnRespondedNeighbours();
             }
-            catch (InterruptedException e)
+            catch (InterruptedException | IOException e)
             {
                 throw new RuntimeException(e);
             }
@@ -40,15 +41,14 @@ class Heartbeat extends Runner
         m_peer.SendFindNode(m_peer.m_id);
     }
 
-    private void ShareAllDataItemsToNeighbours() throws InterruptedException
+    private void ShareAllDataItemsToNeighbours() throws InterruptedException, IOException
     {
-
         for(var data : m_peer.m_data_table.entrySet())
         {
             Peer.RoutingTableEntry[] close_peers_to_key = m_peer.GetClosePeers(data.getKey(), m_peer.m_m_bits);
-            for(var peer: close_peers_to_key)
+            for(var peer : close_peers_to_key)
             {
-                m_peer.Send(peer.ip_address, peer.port, (m_peer.FormatCommand("STORE") + " " + data.getValue().first + "," + data.getValue().second).getBytes(),false);
+                m_peer.SendDataItem(peer.ip_address, peer.port, data.getValue());
             }
         }
     }

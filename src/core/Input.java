@@ -116,6 +116,7 @@ public class Input
     private void Clear(String[] tokens)
     {
         m_kademlia.GetPeer().m_data_table = new TreeMap<>();
+        m_kademlia.GetPeer().m_data_keys = new HashMap<>();
     }
 
     private void Print(String[] tokens)
@@ -144,7 +145,7 @@ public class Input
         } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
     }
 
-    private void Store(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
+    private void Store(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
     {
         if(m_kademlia.GetPeer() != null)
         {
@@ -173,7 +174,7 @@ public class Input
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
-    private void Robot(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
+    private void Robot(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
     {
         if(m_kademlia.GetPeer() != null)
         {
@@ -214,7 +215,7 @@ public class Input
         return nick_name;
     }
 
-    private void Get(String[] tokens) throws NoSuchAlgorithmException, InterruptedException
+    private void Get(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
     {
         if(m_kademlia.GetPeer() != null)
         {
