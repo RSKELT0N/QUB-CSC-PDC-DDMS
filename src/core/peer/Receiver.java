@@ -6,14 +6,13 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.Semaphore;
 
 class Receiver extends Runner
 {
-    public class Packet
+    public static class Packet
     {
         public HashMap<Peer.RoutingTableEntry, byte[]> m_payloads;
 
@@ -96,7 +95,7 @@ class Receiver extends Runner
         }
     }
 
-    private HashMap<BigInteger, Lib.Pair<Semaphore, Packet>> m_received;
-    private core.peer.Node m_receiver;
-    private Peer m_receiver_peer;
+    private final Peer m_receiver_peer;
+    private final core.peer.Node m_receiver;
+    private final HashMap<BigInteger, Lib.Pair<Semaphore, Packet>> m_received;
 }

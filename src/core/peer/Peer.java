@@ -2,13 +2,14 @@ package core.peer;
 
 import core.Lib;
 
-import javax.xml.crypto.Data;
 import java.io.*;
 import java.math.BigInteger;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
@@ -56,13 +57,17 @@ public class Peer
 
     static public class DataItem<T> implements Serializable
     {
-        public String key;
+        public boolean is_file;
         public T value;
+        public String key;
+        public long unix_timestamp;
 
-        DataItem(String k, T v)
+        DataItem(String k, T v, boolean is_file)
         {
+            this.is_file = is_file;
             this.key = k;
             this.value = v;
+            this.unix_timestamp = System.nanoTime();
         }
     }
 
@@ -396,7 +401,7 @@ public class Peer
             SendFindNode(key);
 
             RoutingTableEntry[] closest_peers_to_key = GetClosePeers(key, m_alpha);
-            DataItem<?> data_item = new DataItem<>(data_id, "");
+            DataItem<?> data_item = new DataItem<>(data_id, "", false);
 
             for(var peer : closest_peers_to_key)
                 SendDataItem(peer.ip_address, peer.port, data_item);
@@ -417,10 +422,10 @@ public class Peer
         this.m_socket.m_socket.close();
     }
 
-    public void AddDataItem(String key, String value) throws NoSuchAlgorithmException, InterruptedException, IOException
+    public void AddDataItem(String key, byte[] value, boolean is_file) throws NoSuchAlgorithmException, InterruptedException, IOException
     {
         BigInteger data_key = Lib.SHA1(key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
-        this.m_data_table.put(data_key, new DataItem<>(key, value));
+        this.m_data_table.put(data_key, new DataItem<>(key, value, is_file));
         this.m_data_keys.put(data_key, key);
 
         RoutingTableEntry[] close_peers = GetClosePeers(data_key, m_m_bits);
@@ -480,7 +485,9 @@ public class Peer
 
         for(var data : m_data_table.entrySet())
         {
-            System.out.println(data.getKey() + "(" + data.getValue().key + ")" + " | " + data.getValue().value);
+            if(!data.getValue().is_file)
+                System.out.println(data.getKey() + "(" + data.getValue().key + ")" + " " + (LocalTime.ofNanoOfDay(data.getValue().unix_timestamp)) + " | " + new String((byte[])data.getValue().value));
+            else System.out.println(data.getKey() + "(" + data.getValue().key + ")" + " " + (LocalTime.ofNanoOfDay(data.getValue().unix_timestamp)) + " | " + "(file, use /print to see content)");
         }
         System.out.println("---------------");
     }

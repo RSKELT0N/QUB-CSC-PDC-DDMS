@@ -1,9 +1,10 @@
 package core;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
@@ -38,7 +39,7 @@ public class Input
         this.m_commands = new HashMap<>();
         m_commands.put("/help",         new CommandEntry(this::Help,         "Display the necessary information to control the program",             0, "/help"));
         m_commands.put("/exit",         new CommandEntry(this::Exit,         "Close the peer and exit the program",                                  0, "/exit"));
-        m_commands.put("/print",        new CommandEntry(this::Print,        "Will invoke the print function",                                       1, "/print [rt/dt/info/idx]"));
+        m_commands.put("/print",        new CommandEntry(this::Print,        "Will invoke the print function",                                       1, "/print [rt/dt/info/idx/data]"));
         m_commands.put("/connect",      new CommandEntry(this::Connect,      "Will connect to bootstrapped node if specified, otherwise broadcast.", 0, "/connect opt:[ [ip] [port] ]"));
         m_commands.put("/clear",        new CommandEntry(this::Clear,        "Will reset the data table within the peer",                            0, "/clear"));
         m_commands.put("/store",        new CommandEntry(this::Store,        "Store a key/value pair in the distributed system",                     2, "/store [key] [value]"));
@@ -48,6 +49,7 @@ public class Input
         m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink,   "Toggle the connection of the peer to the network.",                    0, "/togglelink"));
         m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,      "Return all known data keys within the network.",                       0, "/getkeys"));
         m_commands.put("/storeweather", new CommandEntry(this::StoreWeather, "Stores the current weather of the passed city.",                       1, "/storeweather [city]"));
+        m_commands.put("/storefile",    new CommandEntry(this::StoreFile,    "Stores the bytes found in the file of the passed path.",               2, "/storefile [name] [path]"));
     }
 
     public void ReceiveInput() throws InterruptedException, IOException, NoSuchAlgorithmException
@@ -119,7 +121,7 @@ public class Input
         m_kademlia.GetPeer().m_data_keys = new HashMap<>();
     }
 
-    private void Print(String[] tokens)
+    private void Print(String[] tokens) throws NoSuchAlgorithmException
     {
         if(this.m_kademlia.GetPeer() != null)
         {
@@ -139,7 +141,10 @@ public class Input
                     this.m_kademlia.PrintInfo();
                     break;
                 default:
-                    System.out.println("~ Option not valid");
+                    BigInteger key_hash = Lib.SHA1(option, BigInteger.valueOf(1).shiftLeft(m_kademlia.GetPeer().m_m_bits));
+                    if(m_kademlia.GetPeer().m_data_table.containsKey(key_hash))
+                        System.out.println("Data" + " " + "(" + option + ")" + ":" + " " + new String((byte[])m_kademlia.GetPeer().m_data_table.get(key_hash).value));
+                    else System.out.println("~ Option not valid");
                     break;
             }
         } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
@@ -151,7 +156,7 @@ public class Input
         {
             String key = tokens[0];
             String value = String.join(" ", Arrays.copyOfRange(tokens, 1, tokens.length));
-            this.m_kademlia.StoreData(key, value);
+            this.m_kademlia.StoreData(key, value.getBytes(), false);
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
@@ -170,7 +175,31 @@ public class Input
 
             String result = new String(reader.readAllBytes());
 
-            this.m_kademlia.StoreData(city, result);
+            this.m_kademlia.StoreData(city, result.getBytes(), false);
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
+    }
+
+    private void StoreFile(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            Path file = Paths.get(tokens[1]);
+
+            if(!Files.exists(file))
+            {
+                System.out.println("~ Path given is not valid");
+                return;
+            }
+
+            if(Files.size(file) > m_kademlia.GetPeer().m_socket.MAX_RECEIVE_SIZE)
+            {
+                System.out.println("~ File at specified path is too large (limit (16KB))");
+                return;
+            }
+
+            byte[] file_bytes = Files.readAllBytes(file);
+
+            this.m_kademlia.StoreData(tokens[0], file_bytes, true);
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
@@ -182,7 +211,7 @@ public class Input
             String key = RandomLetters(10);
             String value = RandomLetters(value_size);
 
-            this.m_kademlia.StoreData(key, value);
+            this.m_kademlia.StoreData(key, value.getBytes(), false);
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 

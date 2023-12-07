@@ -55,6 +55,6 @@ public class Node
     public String m_ip_address;
     public DatagramSocket m_socket;
     public final int DEFAULT_PORT = 52222;
+    public final int MAX_RECEIVE_SIZE = 1<<16;
     private final int RANDOM_PORT = 0;
-    private final int MAX_RECEIVE_SIZE = 1<<16;
 }
