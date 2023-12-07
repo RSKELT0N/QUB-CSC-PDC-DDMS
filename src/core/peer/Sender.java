@@ -4,6 +4,8 @@ import core.Lib;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +46,7 @@ class Sender extends Runner
                         // Join by unknown IP (broadcast)
                         m_peer.m_socket.m_socket.setBroadcast(true);
                         byte[] message = AddMagicValuePrefix(current_item.second);
-                        this.m_sender.SendPacket(message, "255.255.255.255", m_peer.m_socket.DEFAULT_PORT);
+                        SendToAllBroadcastAddresses(message);
                         m_peer.m_socket.m_socket.setBroadcast(false);
                     }
                 }
@@ -79,6 +81,21 @@ class Sender extends Runner
     public void AddSendItem(Peer.RoutingTableEntry p, byte[] s) throws InterruptedException
     {
         m_queue.put(new Lib.Pair<>(p, s));
+    }
+
+    private void SendToAllBroadcastAddresses(byte[] message) throws IOException
+    {
+        var interfaces = NetworkInterface.getNetworkInterfaces();
+        while(interfaces.hasMoreElements() && !m_peer.m_connected)
+        {
+            var inter = interfaces.nextElement();
+            for(var address : inter.getInterfaceAddresses())
+            {
+                var broadcast = address.getBroadcast();
+                if(broadcast != null)
+                    this.m_sender.SendPacket(message, broadcast.getHostAddress(), m_peer.m_socket.DEFAULT_PORT);
+            }
+        }
     }
 
     private Peer m_peer;

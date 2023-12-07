@@ -34,6 +34,9 @@ public class Kademlia implements Remote, Runnable
         this.m_commands = new HashMap<>();
         this.m_commands.put("PING",                this.m_peer::Ping);
         this.m_commands.put("PONG",                this.m_peer::Pong);
+        this.m_commands.put("CONNECT_REQUEST",     this.m_peer::ConnectRequest);
+        this.m_commands.put("CONNECT_RESPONSE",    this.m_peer::ConnectResponse);
+        this.m_commands.put("FIND_NODE_RESPONSE",  this.m_peer::FindNodeResponse);
         this.m_commands.put("FIND_NODE_REQUEST",   this.m_peer::FindNodeRequest);
         this.m_commands.put("FIND_NODE_RESPONSE",  this.m_peer::FindNodeResponse);
         this.m_commands.put("FIND_VALUE_REQUEST",  this.m_peer::FindValueRequest);

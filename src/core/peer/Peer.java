@@ -158,7 +158,7 @@ public class Peer
         InsertPeerIntoRoutingTable(nick_name, id, peer_info.ip_address, peer_info.port);
         SetPingStateForPeer(id, true);
 
-        if(!m_connected)
+        if(!m_connected && !Objects.equals(id, m_id))
         {
             this.m_bootstrapped_ip = peer_info.ip_address;
             this.m_bootstrapped_port = peer_info.port;
@@ -247,6 +247,48 @@ public class Peer
         }
     }
 
+    public void ConnectRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
+    {
+        String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+        assert message_string_tokens.length == 2;
+
+        BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
+        BigInteger peer_id = new BigInteger(message_string_tokens[1]);
+
+        RoutingTableEntry[] close_peers = GetClosePeers(peer_id, m_m_bits);
+
+        byte[] to_send = BindCommand(("CONNECT_RESPONSE" + ":" + command_count + " "), close_peers);
+
+        Send(peer_info.ip_address, peer_info.port, to_send, false);
+    }
+
+    public void ConnectResponse(RoutingTableEntry peer_info, byte[] message) throws IOException, ClassNotFoundException, InterruptedException
+    {
+        if(!m_connected)
+        {
+            String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
+            BigInteger command_count = new BigInteger(message_string_tokens[0].split(":")[1]);
+
+            ByteArrayInputStream in = new ByteArrayInputStream(Arrays.copyOfRange(message, message_string_tokens[0].length() + 1, message.length));
+            ObjectInputStream iis = new ObjectInputStream(in);
+
+            SendPing(peer_info.ip_address, peer_info.port);
+            RoutingTableEntry[] peers = (RoutingTableEntry[]) iis.readObject();
+
+            for (var peer : peers) {
+                BigInteger bucket = DetermineBucket(peer.id);
+
+                if (!(m_routing_table.get(bucket).containsKey(peer.id)))
+                {
+                    if (!Objects.equals(peer.id, m_id)) {
+                        SendPing(peer.ip_address, peer.port);
+                        Send(peer.ip_address, peer.port, ("FIND_NODE_REQUEST" + ":" + command_count + " " + m_id).getBytes(), true);
+                    }
+                }
+            }
+        }
+    }
+
     public void FindValueRequest(RoutingTableEntry peer_info, byte[] message) throws IOException, InterruptedException
     {
         String[] message_string_tokens = new String(message, StandardCharsets.UTF_8).replaceAll("\0", "").split(" ");
@@ -289,12 +331,12 @@ public class Peer
 
     public void JoinThroughPeer(String boot_ip, int boot_port) throws InterruptedException
     {
-        Send(boot_ip, boot_port, (FormatCommand("FIND_NODE_REQUEST") + " " + m_id).getBytes(), true);
+        Send(boot_ip, boot_port, (FormatCommand("CONNECT_REQUEST") + " " + m_id).getBytes(), true);
     }
 
-    public void JoinThroughBroadcast() throws IOException, InterruptedException
+    public void JoinThroughBroadcast() throws InterruptedException
     {
-        byte[] broadcast_join_message = (FormatCommand("FIND_NODE_REQUEST") + " " + m_id).getBytes();
+        byte[] broadcast_join_message = (FormatCommand("CONNECT_REQUEST") + " " + m_id).getBytes();
         m_sender.AddSendItem(null, broadcast_join_message);
     }
 
