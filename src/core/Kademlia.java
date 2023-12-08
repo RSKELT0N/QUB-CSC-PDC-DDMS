@@ -131,6 +131,17 @@ public class Kademlia implements Remote, Runnable
         }
     }
 
+    public void ObtainMissing() throws InterruptedException, NoSuchAlgorithmException, IOException
+    {
+        for(var idx : m_peer.m_data_keys.entrySet())
+        {
+            if(!m_peer.m_data_table.containsKey(idx.getKey()))
+            {
+                m_peer.GetDataItem(idx.getValue());
+            }
+        }
+    }
+
     public void ToggleLink()
     {
         ((Runner) m_peer.m_sender).ToggleLink();

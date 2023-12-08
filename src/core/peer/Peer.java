@@ -408,6 +408,18 @@ public class Peer
         }
     }
 
+    public boolean RemoveDataItem(String data_key) throws NoSuchAlgorithmException
+    {
+        BigInteger key = Lib.SHA1(data_key, BigInteger.valueOf(1).shiftLeft(m_m_bits));
+
+        if(m_data_table.containsKey(key) && m_data_keys.containsKey(key))
+        {
+            m_data_keys.remove(key);
+            m_data_table.remove(key);
+            return true;
+        } else return false;
+    }
+
     public String FormatCommand(String command)
     {
         BigInteger curr_command = m_sender.GetAndIncrementSendCount();

@@ -1,5 +1,7 @@
 package core;
 
+import core.peer.Runner;
+
 import java.io.*;
 import java.math.BigInteger;
 import java.nio.file.Files;
@@ -37,19 +39,23 @@ public class Input
     private void InitialiseCommands()
     {
         this.m_commands = new HashMap<>();
-        m_commands.put("/help",         new CommandEntry(this::Help,         "Display the necessary information to control the program",             0, "/help"));
-        m_commands.put("/exit",         new CommandEntry(this::Exit,         "Close the peer and exit the program",                                  0, "/exit"));
-        m_commands.put("/print",        new CommandEntry(this::Print,        "Will invoke the print function",                                       1, "/print [rt/dt/info/idx/data]"));
-        m_commands.put("/connect",      new CommandEntry(this::Connect,      "Will connect to bootstrapped node if specified, otherwise broadcast.", 0, "/connect opt:[ [ip] [port] ]"));
-        m_commands.put("/clear",        new CommandEntry(this::Clear,        "Will reset the data table within the peer",                            0, "/clear"));
-        m_commands.put("/store",        new CommandEntry(this::Store,        "Store a key/value pair in the distributed system",                     2, "/store [key] [value]"));
-        m_commands.put("/get",          new CommandEntry(this::Get,          "Get the value of the respective key in the distributed system",        1, "/get [key]"));
-        m_commands.put("/init",         new CommandEntry(this::Init,         "Initialise the peer, creating its socket and thread for joining.",     0, "/init [opt:nickname] [opt:port]"));
-        m_commands.put("/robot",        new CommandEntry(this::Robot,        "Automated robot option to generate example data in the network.",      1, "/robot [size]"));
-        m_commands.put("/togglelink",   new CommandEntry(this::ToggleLink,   "Toggle the connection of the peer to the network.",                    0, "/togglelink"));
-        m_commands.put("/getkeys",      new CommandEntry(this::GetKeys,      "Return all known data keys within the network.",                       0, "/getkeys"));
-        m_commands.put("/storeweather", new CommandEntry(this::StoreWeather, "Stores the current weather of the passed city.",                       1, "/storeweather [city]"));
-        m_commands.put("/storefile",    new CommandEntry(this::StoreFile,    "Stores the bytes found in the file of the passed path.",               2, "/storefile [name] [path]"));
+        m_commands.put("/help",          new CommandEntry(this::Help,          "Display the necessary information to control the program",             0, "/help"));
+        m_commands.put("/exit",          new CommandEntry(this::Exit,          "Close the peer and exit the program",                                  0, "/exit"));
+        m_commands.put("/print",         new CommandEntry(this::Print,         "Will invoke the print function",                                       1, "/print [rt/dt/info/idx/data]"));
+        m_commands.put("/connect",       new CommandEntry(this::Connect,       "Will connect to bootstrapped node if specified, otherwise broadcast.", 0, "/connect opt:[ [ip] [port] ]"));
+        m_commands.put("/clear",         new CommandEntry(this::Clear,         "Will reset the data table within the peer",                            0, "/clear"));
+        m_commands.put("/store",         new CommandEntry(this::Store,         "Store a key/value pair in the distributed system",                     2, "/store [key] [value]"));
+        m_commands.put("/get",           new CommandEntry(this::Get,           "Get the value of the respective key in the distributed system",        1, "/get [key]"));
+        m_commands.put("/init",          new CommandEntry(this::Init,          "Initialise the peer, creating its socket and thread for joining.",     0, "/init [opt:nickname] [opt:port]"));
+        m_commands.put("/robot",         new CommandEntry(this::Robot,         "Automated robot option to generate example data in the network.",      1, "/robot [size]"));
+        m_commands.put("/togglelink",    new CommandEntry(this::ToggleLink,    "Toggle the connection of the peer to the network.",                    0, "/togglelink"));
+        m_commands.put("/getkeys",       new CommandEntry(this::GetKeys,       "Return all known data keys within the network.",                       0, "/getkeys"));
+        m_commands.put("/storeweather",  new CommandEntry(this::StoreWeather,  "Stores the current weather of the passed city.",                       1, "/storeweather [city]"));
+        m_commands.put("/storefile",     new CommandEntry(this::StoreFile,     "Stores the bytes found in the file of the passed path.",               2, "/storefile [name] [path]"));
+        m_commands.put("/togglebeat",    new CommandEntry(this::ToggleBeat,    "Fetches the missing data items in the peers local data table.",        0, "/togglebeat"));
+        m_commands.put("/obtainmissing", new CommandEntry(this::ObtainMissing, "Toggles the current heartbeat.",                                       0, "/obtainmissing"));
+        m_commands.put("/rmdata",        new CommandEntry(this::RemoveData,    "Removes an piece of data from the peers local data table.",            1, "/rmdata [name]"));
+        m_commands.put("/export",        new CommandEntry(this::Export,        "Export a piece of data towards a file.",                               2, "/export [name] [path]"));
     }
 
     public void ReceiveInput() throws InterruptedException, IOException, NoSuchAlgorithmException
@@ -96,11 +102,28 @@ public class Input
         } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
     }
 
+    private void ObtainMissing(String[] tokens) throws InterruptedException, NoSuchAlgorithmException, IOException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            m_kademlia.ObtainMissing();
+        } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
+    }
+
     private void ToggleLink(String[] tokens)
     {
         if(m_kademlia.GetPeer() != null)
         {
             this.m_kademlia.ToggleLink();
+        } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
+    }
+
+    private void ToggleBeat(String[] tokens)
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            ((Runner)this.m_kademlia.GetPeer().m_heartbeat).ToggleLink();
+            System.out.println("~ Heartbeat has been toggled");
         } else System.out.println("~ Please use the /init command to create the peer to access it's print functionality");
     }
 
@@ -203,6 +226,30 @@ public class Input
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
+    private void Export(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            BigInteger hash_key = Lib.SHA1(tokens[0], BigInteger.valueOf(1).shiftLeft(m_kademlia.GetPeer().m_m_bits));
+
+            if(m_kademlia.GetPeer().m_data_table.containsKey(hash_key))
+            {
+                Path file = Paths.get(tokens[1]);
+
+                if (Files.exists(file))
+                {
+                    System.out.println("~ Path given has an already file present");
+                    return;
+                }
+
+                Files.createFile(file);
+                byte[] file_bytes = (byte[])m_kademlia.GetPeer().m_data_table.get(hash_key).value;
+                Files.write(file, file_bytes);
+
+            } else System.out.println("~ The data item" + " " + "(" + tokens[0] + ")" + " "  + "has not been found");
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
+    }
+
     private void Robot(String[] tokens) throws NoSuchAlgorithmException, InterruptedException, IOException
     {
         if(m_kademlia.GetPeer() != null)
@@ -252,6 +299,20 @@ public class Input
         } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
     }
 
+
+    private void RemoveData(String[] tokens) throws NoSuchAlgorithmException
+    {
+        if(m_kademlia.GetPeer() != null)
+        {
+            boolean removed = this.m_kademlia.GetPeer().RemoveDataItem(tokens[0]);
+
+            if(removed)
+                System.out.println("~ Data item (" + tokens[0] + ")" + " " + "has been removed");
+            else System.out.println("~ Data item (" + tokens[0] + ")" + " " + "was not found in the data table");
+
+        } else System.out.println("~ Please use the /init command to initialise the peer before accessing data in the network");
+    }
+
     private void Help(String[] tokens)
     {
         System.out.println("Commands\n----------");
@@ -264,7 +325,9 @@ public class Input
     private void Exit(String[] tokens)
     {
         SetAliveState(false);
-        m_kademlia.Close();
+
+        if(m_kademlia.GetPeer() != null)
+            m_kademlia.Close();
     }
 
     private void SetAliveState(boolean state)
